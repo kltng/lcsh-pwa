@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { searchLcsh } from "@/lib/lcsh";
 
-export async function GET(request: NextRequest) {
+export async function GET (request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
   const query = searchParams.get("q");
   const searchType = (searchParams.get("searchtype") || "left-anchored") as "left-anchored" | "keyword";

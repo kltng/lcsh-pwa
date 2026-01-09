@@ -9,7 +9,7 @@ declare module "next-pwa" {
     [key: string]: any;
   }
 
-  function withPWA(config?: PWAConfig): (nextConfig: NextConfig) => NextConfig;
+  function withPWA (config?: PWAConfig): (nextConfig: NextConfig) => NextConfig;
   export default withPWA;
 }
 

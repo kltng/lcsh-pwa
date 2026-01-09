@@ -15,7 +15,7 @@ export interface BestMatch {
 /**
  * Calculate Levenshtein distance between two strings
  */
-export function levenshteinDistance(a: string, b: string): number {
+export function levenshteinDistance (a: string, b: string): number {
   const matrix: number[][] = Array(b.length + 1)
     .fill(null)
     .map(() => Array(a.length + 1).fill(0));
@@ -45,7 +45,7 @@ export function levenshteinDistance(a: string, b: string): number {
 /**
  * Calculate similarity score between two strings (0-100)
  */
-export function calculateSimilarity(a: string, b: string): number {
+export function calculateSimilarity (a: string, b: string): number {
   if (!a || !b) return 0;
 
   const aLower = a.toLowerCase();
@@ -67,7 +67,7 @@ export function calculateSimilarity(a: string, b: string): number {
 /**
  * Find the best match for a term in a list of items
  */
-export function findBestMatch(
+export function findBestMatch (
   term: string,
   items: MatchItem[]
 ): BestMatch {
@@ -95,7 +95,7 @@ export function findBestMatch(
 /**
  * Get a color based on similarity score
  */
-export function getSimilarityColor(score: number): string {
+export function getSimilarityColor (score: number): string {
   if (score >= 90) return "#4caf50"; // Green
   if (score >= 70) return "#8bc34a"; // Light Green
   if (score >= 50) return "#ffc107"; // Amber
@@ -106,7 +106,7 @@ export function getSimilarityColor(score: number): string {
 /**
  * Get a text label based on similarity score
  */
-export function getSimilarityLabel(score: number): string {
+export function getSimilarityLabel (score: number): string {
   if (score >= 90) return "Excellent Match";
   if (score >= 70) return "Good Match";
   if (score >= 50) return "Moderate Match";

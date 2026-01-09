@@ -16,7 +16,7 @@ export interface LOCSearchResponse {
 /**
  * Search Library of Congress Subject Headings
  */
-export async function searchLCSH(
+export async function searchLCSH (
   query: string,
   options?: {
     searchType?: "left-anchored" | "keyword";
@@ -53,7 +53,7 @@ export async function searchLCSH(
 /**
  * Search Library of Congress Name Authority File
  */
-export async function searchLCNAF(
+export async function searchLCNAF (
   query: string,
   options?: {
     rdftype?: string;
@@ -87,7 +87,7 @@ export async function searchLCNAF(
 /**
  * Search multiple LCSH terms in parallel
  */
-export async function searchMultipleTerms(
+export async function searchMultipleTerms (
   terms: string[],
   concurrency: number = 2
 ): Promise<Record<string, LOCSearchResponse>> {
@@ -120,7 +120,7 @@ export async function searchMultipleTerms(
 /**
  * Extract identifier from LOC URI
  */
-export function extractIdentifier(uri: string): string {
+export function extractIdentifier (uri: string): string {
   // LOC URIs typically look like: http://id.loc.gov/authorities/subjects/sh85012345
   const match = uri.match(/\/authorities\/(?:subjects|names)\/([^\/]+)/);
   return match ? match[1] : "";

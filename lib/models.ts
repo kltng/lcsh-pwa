@@ -77,7 +77,7 @@ const CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours
  * Fetch models from models.dev API
  * Uses our API route on client-side, direct fetch on server-side
  */
-export async function fetchModelsDev(): Promise<ModelsDevResponse> {
+export async function fetchModelsDev (): Promise<ModelsDevResponse> {
   try {
     let url: string;
 
@@ -105,19 +105,8 @@ export async function fetchModelsDev(): Promise<ModelsDevResponse> {
     return await response.json();
   } catch (error) {
     console.error("Error fetching models.dev:", error);
-    // Provide more helpful error message
-    if (error instanceof TypeError) {
-      if (error.message.includes("Failed to parse URL")) {
-        throw new Error(
-          "Failed to parse API URL. This may be a browser compatibility issue."
-        );
-      }
-      if (error.message.includes("fetch")) {
-        throw new Error(
-          "Network error. Please check your internet connection and try again."
-        );
-      }
-    }
+    // Re-throw the error so callers can handle it (e.g., fallback to local registry)
+    // Don't wrap it in a new error as that breaks error handling upstream
     throw error;
   }
 }
@@ -125,7 +114,7 @@ export async function fetchModelsDev(): Promise<ModelsDevResponse> {
 /**
  * Get all providers from models.dev (with fallback to local registry)
  */
-export async function getProviders(): Promise<ProviderInfo[]> {
+export async function getProviders (): Promise<ProviderInfo[]> {
   const now = Date.now();
   if (cachedProviders && now - cacheTimestamp < CACHE_DURATION) {
     return cachedProviders;
@@ -180,72 +169,94 @@ export async function getProviders(): Promise<ProviderInfo[]> {
 /**
  * Get all models from models.dev, grouped by provider
  */
-export async function getAllModels(): Promise<ModelInfo[]> {
+export async function getAllModels (): Promise<ModelInfo[]> {
   const now = Date.now();
   if (cachedModels && now - cacheTimestamp < CACHE_DURATION) {
     return cachedModels;
   }
 
-  const data = await fetchModelsDev();
-  const models: ModelInfo[] = [];
-
-  for (const [providerId, providerData] of Object.entries(data)) {
-    // Skip if it doesn't have models (might be a model entry, not a provider)
-    if (!providerData.models) continue;
-
-    for (const [modelId, modelData] of Object.entries(providerData.models)) {
-      // Construct the full model ID with provider prefix
-      // If modelData.id exists, check if it already has a provider prefix
-      let fullModelId: string;
-      if (modelData.id) {
-        if (modelData.id.includes("/")) {
-          // Already has provider prefix (e.g., "openai/gpt-oss-20b")
-          fullModelId = modelData.id;
-        } else {
-          // No prefix, add provider prefix (e.g., "gemini-2.5-flash" -> "google/gemini-2.5-flash")
-          fullModelId = `${providerId}/${modelData.id}`;
-        }
-      } else {
-        // Use the key as the model name
-        fullModelId = `${providerId}/${modelId}`;
-      }
-
-      models.push({
-        id: fullModelId, // Always includes provider prefix for consistent lookup
-        name: modelData.name || modelId,
-        provider: providerId, // The hosting provider (e.g., "lmstudio")
-        providerName: providerData.name,
-        attachment: modelData.attachment,
-        reasoning: modelData.reasoning,
-        toolCall: modelData.tool_call,
-        structuredOutput: modelData.structured_output,
-        temperature: modelData.temperature,
-        knowledge: modelData.knowledge,
-        releaseDate: modelData.release_date,
-        lastUpdated: modelData.last_updated,
-        openWeights: modelData.open_weights,
-        cost: modelData.cost,
-        limit: modelData.limit,
-        modalities: modelData.modalities,
-        status: modelData.status,
-        baseURL: providerData.api, // For OpenAI-compatible providers (e.g., lmstudio's localhost URL)
-        apiKeyEnv: providerData.env?.[0],
-      });
+  try {
+    const data = await fetchModelsDev();
+    
+    // Check if we got valid data
+    if (!data || typeof data !== "object" || Object.keys(data).length === 0) {
+      throw new Error("Empty response from models.dev");
     }
+    
+    const models: ModelInfo[] = [];
+
+    for (const [providerId, providerData] of Object.entries(data)) {
+      // Skip if it doesn't have models (might be a model entry, not a provider)
+      if (!providerData.models) continue;
+
+      for (const [modelId, modelData] of Object.entries(providerData.models)) {
+        // Construct the full model ID with provider prefix
+        // If modelData.id exists, check if it already has a provider prefix
+        let fullModelId: string;
+        if (modelData.id) {
+          if (modelData.id.includes("/")) {
+            // Already has provider prefix (e.g., "openai/gpt-oss-20b")
+            fullModelId = modelData.id;
+          } else {
+            // No prefix, add provider prefix (e.g., "gemini-2.5-flash" -> "google/gemini-2.5-flash")
+            fullModelId = `${providerId}/${modelData.id}`;
+          }
+        } else {
+          // Use the key as the model name
+          fullModelId = `${providerId}/${modelId}`;
+        }
+
+        models.push({
+          id: fullModelId, // Always includes provider prefix for consistent lookup
+          name: modelData.name || modelId,
+          provider: providerId, // The hosting provider (e.g., "lmstudio")
+          providerName: providerData.name,
+          attachment: modelData.attachment,
+          reasoning: modelData.reasoning,
+          toolCall: modelData.tool_call,
+          structuredOutput: modelData.structured_output,
+          temperature: modelData.temperature,
+          knowledge: modelData.knowledge,
+          releaseDate: modelData.release_date,
+          lastUpdated: modelData.last_updated,
+          openWeights: modelData.open_weights,
+          cost: modelData.cost,
+          limit: modelData.limit,
+          modalities: modelData.modalities,
+          status: modelData.status,
+          baseURL: providerData.api, // For OpenAI-compatible providers (e.g., lmstudio's localhost URL)
+          apiKeyEnv: providerData.env?.[0],
+        });
+      }
+    }
+
+    // Filter out deprecated models
+    const filteredModels = models.filter((m) => m.status !== "deprecated");
+
+    cachedModels = filteredModels;
+    cacheTimestamp = now;
+    return filteredModels;
+  } catch (error) {
+    console.warn("Failed to fetch from models.dev, using local registry:", error);
+    // Fallback to local registry
+    const localModels = getAllLocalModels();
+    cachedModels = localModels.map((m) => ({
+      id: m.id,
+      name: m.name,
+      provider: m.provider,
+      providerName: m.providerName,
+      baseURL: m.baseURL,
+      apiKeyEnv: m.apiKeyEnv,
+    }));
+    cacheTimestamp = now;
+    return cachedModels;
   }
-
-  // Filter out deprecated models
-  const filteredModels = models.filter((m) => m.status !== "deprecated");
-
-  cachedModels = filteredModels;
-  cacheTimestamp = now;
-  return filteredModels;
 }
 
 /**
  * Get models for a specific provider
  */
-export async function getModelsByProvider(providerId: string): Promise<ModelInfo[]> {
+export async function getModelsByProvider (providerId: string): Promise<ModelInfo[]> {
   try {
     const allModels = await getAllModels();
     return allModels.filter((m) => m.provider === providerId);
@@ -266,7 +277,7 @@ export async function getModelsByProvider(providerId: string): Promise<ModelInfo
  * Get a specific model by ID
  * Handles both formats: "provider/model" and "model" (without provider prefix)
  */
-export async function getModelById(modelId: string): Promise<ModelInfo | null> {
+export async function getModelById (modelId: string): Promise<ModelInfo | null> {
   try {
     const allModels = await getAllModels();
 
@@ -313,7 +324,7 @@ export async function getModelById(modelId: string): Promise<ModelInfo | null> {
  * Get SDK configuration for a model
  * Returns the appropriate Vercel AI SDK configuration
  */
-export function getModelSDKConfig(model: ModelInfo): {
+export function getModelSDKConfig (model: ModelInfo): {
   provider: "openai" | "google" | "anthropic" | "openai-compatible";
   baseURL?: string;
   modelId: string;
@@ -381,7 +392,7 @@ export function getModelSDKConfig(model: ModelInfo): {
 /**
  * Get default base URL for common providers
  */
-function getDefaultBaseURL(providerId: string): string {
+function getDefaultBaseURL (providerId: string): string {
   const defaults: Record<string, string> = {
     deepseek: "https://api.deepseek.com/v1",
     qwen: "https://dashscope.aliyuncs.com/compatible-mode/v1",

@@ -48,7 +48,7 @@ export interface AIResponse {
 /**
  * Generate LCSH suggestions using the configured AI model
  */
-export async function generateLcshSuggestions(
+export async function generateLcshSuggestions (
   options: GenerateOptions
 ): Promise<AIResponse> {
   const response = await fetch("/api/generate", {
@@ -76,7 +76,7 @@ export async function generateLcshSuggestions(
 /**
  * Generate MARC records for validated LCSH terms
  */
-export async function generateMarcRecords(
+export async function generateMarcRecords (
   options: MarcGenerationOptions
 ): Promise<AIResponse> {
   const response = await fetch("/api/generate", {
@@ -117,7 +117,7 @@ export interface ParsedSuggestions {
   rawResponse: string;
 }
 
-export function parseLcshSuggestions(response: AIResponse): ParsedSuggestions {
+export function parseLcshSuggestions (response: AIResponse): ParsedSuggestions {
   const content = response.text;
 
   // Extract subject analysis - handle both ### and #### headers
@@ -235,7 +235,7 @@ export function parseLcshSuggestions(response: AIResponse): ParsedSuggestions {
 /**
  * Parse MARC records from AI response
  */
-export function parseMarcRecords(
+export function parseMarcRecords (
   response: AIResponse,
   terms: string[]
 ): Record<string, string> {
