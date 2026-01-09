@@ -105,19 +105,8 @@ export async function fetchModelsDev (): Promise<ModelsDevResponse> {
     return await response.json();
   } catch (error) {
     console.error("Error fetching models.dev:", error);
-    // Provide more helpful error message
-    if (error instanceof TypeError) {
-      if (error.message.includes("Failed to parse URL")) {
-        throw new Error(
-          "Failed to parse API URL. This may be a browser compatibility issue."
-        );
-      }
-      if (error.message.includes("fetch")) {
-        throw new Error(
-          "Network error. Please check your internet connection and try again."
-        );
-      }
-    }
+    // Re-throw the error so callers can handle it (e.g., fallback to local registry)
+    // Don't wrap it in a new error as that breaks error handling upstream
     throw error;
   }
 }
@@ -186,60 +175,82 @@ export async function getAllModels (): Promise<ModelInfo[]> {
     return cachedModels;
   }
 
-  const data = await fetchModelsDev();
-  const models: ModelInfo[] = [];
-
-  for (const [providerId, providerData] of Object.entries(data)) {
-    // Skip if it doesn't have models (might be a model entry, not a provider)
-    if (!providerData.models) continue;
-
-    for (const [modelId, modelData] of Object.entries(providerData.models)) {
-      // Construct the full model ID with provider prefix
-      // If modelData.id exists, check if it already has a provider prefix
-      let fullModelId: string;
-      if (modelData.id) {
-        if (modelData.id.includes("/")) {
-          // Already has provider prefix (e.g., "openai/gpt-oss-20b")
-          fullModelId = modelData.id;
-        } else {
-          // No prefix, add provider prefix (e.g., "gemini-2.5-flash" -> "google/gemini-2.5-flash")
-          fullModelId = `${providerId}/${modelData.id}`;
-        }
-      } else {
-        // Use the key as the model name
-        fullModelId = `${providerId}/${modelId}`;
-      }
-
-      models.push({
-        id: fullModelId, // Always includes provider prefix for consistent lookup
-        name: modelData.name || modelId,
-        provider: providerId, // The hosting provider (e.g., "lmstudio")
-        providerName: providerData.name,
-        attachment: modelData.attachment,
-        reasoning: modelData.reasoning,
-        toolCall: modelData.tool_call,
-        structuredOutput: modelData.structured_output,
-        temperature: modelData.temperature,
-        knowledge: modelData.knowledge,
-        releaseDate: modelData.release_date,
-        lastUpdated: modelData.last_updated,
-        openWeights: modelData.open_weights,
-        cost: modelData.cost,
-        limit: modelData.limit,
-        modalities: modelData.modalities,
-        status: modelData.status,
-        baseURL: providerData.api, // For OpenAI-compatible providers (e.g., lmstudio's localhost URL)
-        apiKeyEnv: providerData.env?.[0],
-      });
+  try {
+    const data = await fetchModelsDev();
+    
+    // Check if we got valid data
+    if (!data || typeof data !== "object" || Object.keys(data).length === 0) {
+      throw new Error("Empty response from models.dev");
     }
+    
+    const models: ModelInfo[] = [];
+
+    for (const [providerId, providerData] of Object.entries(data)) {
+      // Skip if it doesn't have models (might be a model entry, not a provider)
+      if (!providerData.models) continue;
+
+      for (const [modelId, modelData] of Object.entries(providerData.models)) {
+        // Construct the full model ID with provider prefix
+        // If modelData.id exists, check if it already has a provider prefix
+        let fullModelId: string;
+        if (modelData.id) {
+          if (modelData.id.includes("/")) {
+            // Already has provider prefix (e.g., "openai/gpt-oss-20b")
+            fullModelId = modelData.id;
+          } else {
+            // No prefix, add provider prefix (e.g., "gemini-2.5-flash" -> "google/gemini-2.5-flash")
+            fullModelId = `${providerId}/${modelData.id}`;
+          }
+        } else {
+          // Use the key as the model name
+          fullModelId = `${providerId}/${modelId}`;
+        }
+
+        models.push({
+          id: fullModelId, // Always includes provider prefix for consistent lookup
+          name: modelData.name || modelId,
+          provider: providerId, // The hosting provider (e.g., "lmstudio")
+          providerName: providerData.name,
+          attachment: modelData.attachment,
+          reasoning: modelData.reasoning,
+          toolCall: modelData.tool_call,
+          structuredOutput: modelData.structured_output,
+          temperature: modelData.temperature,
+          knowledge: modelData.knowledge,
+          releaseDate: modelData.release_date,
+          lastUpdated: modelData.last_updated,
+          openWeights: modelData.open_weights,
+          cost: modelData.cost,
+          limit: modelData.limit,
+          modalities: modelData.modalities,
+          status: modelData.status,
+          baseURL: providerData.api, // For OpenAI-compatible providers (e.g., lmstudio's localhost URL)
+          apiKeyEnv: providerData.env?.[0],
+        });
+      }
+    }
+
+    // Filter out deprecated models
+    const filteredModels = models.filter((m) => m.status !== "deprecated");
+
+    cachedModels = filteredModels;
+    cacheTimestamp = now;
+    return filteredModels;
+  } catch (error) {
+    console.warn("Failed to fetch from models.dev, using local registry:", error);
+    // Fallback to local registry
+    const localModels = getAllLocalModels();
+    cachedModels = localModels.map((m) => ({
+      id: m.id,
+      name: m.name,
+      provider: m.provider,
+      providerName: m.providerName,
+      baseURL: m.baseURL,
+      apiKeyEnv: m.apiKeyEnv,
+    }));
+    cacheTimestamp = now;
+    return cachedModels;
   }
-
-  // Filter out deprecated models
-  const filteredModels = models.filter((m) => m.status !== "deprecated");
-
-  cachedModels = filteredModels;
-  cacheTimestamp = now;
-  return filteredModels;
 }
 
 /**
