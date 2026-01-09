@@ -77,7 +77,7 @@ const CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours
  * Fetch models from models.dev API
  * Uses our API route on client-side, direct fetch on server-side
  */
-export async function fetchModelsDev(): Promise<ModelsDevResponse> {
+export async function fetchModelsDev (): Promise<ModelsDevResponse> {
   try {
     let url: string;
 
@@ -125,7 +125,7 @@ export async function fetchModelsDev(): Promise<ModelsDevResponse> {
 /**
  * Get all providers from models.dev (with fallback to local registry)
  */
-export async function getProviders(): Promise<ProviderInfo[]> {
+export async function getProviders (): Promise<ProviderInfo[]> {
   const now = Date.now();
   if (cachedProviders && now - cacheTimestamp < CACHE_DURATION) {
     return cachedProviders;
@@ -180,7 +180,7 @@ export async function getProviders(): Promise<ProviderInfo[]> {
 /**
  * Get all models from models.dev, grouped by provider
  */
-export async function getAllModels(): Promise<ModelInfo[]> {
+export async function getAllModels (): Promise<ModelInfo[]> {
   const now = Date.now();
   if (cachedModels && now - cacheTimestamp < CACHE_DURATION) {
     return cachedModels;
@@ -245,7 +245,7 @@ export async function getAllModels(): Promise<ModelInfo[]> {
 /**
  * Get models for a specific provider
  */
-export async function getModelsByProvider(providerId: string): Promise<ModelInfo[]> {
+export async function getModelsByProvider (providerId: string): Promise<ModelInfo[]> {
   try {
     const allModels = await getAllModels();
     return allModels.filter((m) => m.provider === providerId);
@@ -266,7 +266,7 @@ export async function getModelsByProvider(providerId: string): Promise<ModelInfo
  * Get a specific model by ID
  * Handles both formats: "provider/model" and "model" (without provider prefix)
  */
-export async function getModelById(modelId: string): Promise<ModelInfo | null> {
+export async function getModelById (modelId: string): Promise<ModelInfo | null> {
   try {
     const allModels = await getAllModels();
 
@@ -313,7 +313,7 @@ export async function getModelById(modelId: string): Promise<ModelInfo | null> {
  * Get SDK configuration for a model
  * Returns the appropriate Vercel AI SDK configuration
  */
-export function getModelSDKConfig(model: ModelInfo): {
+export function getModelSDKConfig (model: ModelInfo): {
   provider: "openai" | "google" | "anthropic" | "openai-compatible";
   baseURL?: string;
   modelId: string;
@@ -381,7 +381,7 @@ export function getModelSDKConfig(model: ModelInfo): {
 /**
  * Get default base URL for common providers
  */
-function getDefaultBaseURL(providerId: string): string {
+function getDefaultBaseURL (providerId: string): string {
   const defaults: Record<string, string> = {
     deepseek: "https://api.deepseek.com/v1",
     qwen: "https://dashscope.aliyuncs.com/compatible-mode/v1",

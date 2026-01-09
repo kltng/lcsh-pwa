@@ -20,6 +20,7 @@ export function FinalRecommendations() {
     setActiveStep,
     setMarcRecords,
     addConversation,
+    resetWizard,
     apiKey,
     modelId,
     isLoading,
@@ -101,6 +102,9 @@ export function FinalRecommendations() {
         finalRecommendations: finalRecommendations || undefined,
         marcRecords: marcRecords || undefined,
       });
+
+      // Reset wizard state before navigating
+      resetWizard();
 
       router.push("/history");
     } catch (err) {
