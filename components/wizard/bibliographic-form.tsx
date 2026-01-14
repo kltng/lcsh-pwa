@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Loader2, Upload, X, Image as ImageIcon } from "lucide-react";
+import { Loader2, Upload, X } from "lucide-react";
 import type { ValidatedTerm } from "@/components/wizard/validated-suggestions";
 
 interface BibliographicFormProps {
@@ -22,6 +22,7 @@ export function BibliographicForm({ onValidatedTerms }: BibliographicFormProps) 
     systemPromptRules,
     apiKey,
     modelId,
+    provider, // Get provider from store to pass to API
     setActiveStep,
     setIsLoading,
     isLoading,
@@ -116,6 +117,11 @@ export function BibliographicForm({ onValidatedTerms }: BibliographicFormProps) 
       return false;
     }
 
+    if (!provider) {
+      setError("Please select a provider in Settings");
+      return false;
+    }
+
     setError(null);
     return true;
   }
@@ -140,7 +146,7 @@ export function BibliographicForm({ onValidatedTerms }: BibliographicFormProps) 
         images: imageData,
       };
 
-      // Call the new structured API
+      // Call the new structured API - MUST include provider for correct model lookup
       const response = await fetch("/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -150,6 +156,7 @@ export function BibliographicForm({ onValidatedTerms }: BibliographicFormProps) 
           bibliographicInfo: enhancedBibliographicInfo,
           systemPromptRules: systemPromptRules || "",
           promptType: "suggestions",
+          provider, // Critical: pass provider to ensure correct model is used
         }),
       });
 
@@ -327,5 +334,3 @@ export function BibliographicForm({ onValidatedTerms }: BibliographicFormProps) 
     </form>
   );
 }
-
-

@@ -32,7 +32,7 @@ export const PROVIDERS: ProviderInfo[] = [
   },
   {
     id: "google",
-    name: "Google (Gemini)",
+    name: "Google",
     apiKeyEnv: "GOOGLE_API_KEY",
     description: "Google Gemini models",
   },
@@ -93,51 +93,57 @@ export const PROVIDERS: ProviderInfo[] = [
   },
 ];
 
-// Model definitions
+// Model definitions - these match the IDs used by models.dev
 export const MODELS: ModelInfo[] = [
   // OpenAI
-  { id: "openai/gpt-4o", name: "GPT-4o", provider: "openai", providerName: "OpenAI" },
-  { id: "openai/gpt-4o-mini", name: "GPT-4o Mini", provider: "openai", providerName: "OpenAI" },
-  { id: "openai/gpt-4-turbo", name: "GPT-4 Turbo", provider: "openai", providerName: "OpenAI" },
-  { id: "openai/gpt-4", name: "GPT-4", provider: "openai", providerName: "OpenAI" },
-  { id: "openai/gpt-3.5-turbo", name: "GPT-3.5 Turbo", provider: "openai", providerName: "OpenAI" },
-  { id: "openai/o1-preview", name: "O1 Preview", provider: "openai", providerName: "OpenAI" },
-  { id: "openai/o1-mini", name: "O1 Mini", provider: "openai", providerName: "OpenAI" },
+  { id: "gpt-4o", name: "GPT-4o", provider: "openai", providerName: "OpenAI" },
+  { id: "gpt-4o-mini", name: "GPT-4o Mini", provider: "openai", providerName: "OpenAI" },
+  { id: "gpt-4-turbo", name: "GPT-4 Turbo", provider: "openai", providerName: "OpenAI" },
+  { id: "gpt-4", name: "GPT-4", provider: "openai", providerName: "OpenAI" },
+  { id: "gpt-3.5-turbo", name: "GPT-3.5 Turbo", provider: "openai", providerName: "OpenAI" },
+  { id: "o1-preview", name: "O1 Preview", provider: "openai", providerName: "OpenAI" },
+  { id: "o1-mini", name: "O1 Mini", provider: "openai", providerName: "OpenAI" },
   
-  // Google
-  { id: "google/gemini-2.0-flash-exp", name: "Gemini 2.0 Flash (Experimental)", provider: "google", providerName: "Google" },
-  { id: "google/gemini-1.5-pro", name: "Gemini 1.5 Pro", provider: "google", providerName: "Google" },
-  { id: "google/gemini-1.5-flash", name: "Gemini 1.5 Flash", provider: "google", providerName: "Google" },
-  { id: "google/gemini-pro", name: "Gemini Pro", provider: "google", providerName: "Google" },
+  // Google - using the exact IDs from models.dev
+  { id: "gemini-2.5-flash", name: "Gemini 2.5 Flash", provider: "google", providerName: "Google" },
+  { id: "gemini-2.5-pro", name: "Gemini 2.5 Pro", provider: "google", providerName: "Google" },
+  { id: "gemini-2.0-flash", name: "Gemini 2.0 Flash", provider: "google", providerName: "Google" },
+  { id: "gemini-2.0-flash-exp", name: "Gemini 2.0 Flash (Experimental)", provider: "google", providerName: "Google" },
+  { id: "gemini-1.5-pro", name: "Gemini 1.5 Pro", provider: "google", providerName: "Google" },
+  { id: "gemini-1.5-flash", name: "Gemini 1.5 Flash", provider: "google", providerName: "Google" },
+  { id: "gemini-pro", name: "Gemini Pro", provider: "google", providerName: "Google" },
   
   // Anthropic
-  { id: "anthropic/claude-3-5-sonnet-20241022", name: "Claude 3.5 Sonnet", provider: "anthropic", providerName: "Anthropic" },
-  { id: "anthropic/claude-3-opus-20240229", name: "Claude 3 Opus", provider: "anthropic", providerName: "Anthropic" },
-  { id: "anthropic/claude-3-sonnet-20240229", name: "Claude 3 Sonnet", provider: "anthropic", providerName: "Anthropic" },
-  { id: "anthropic/claude-3-haiku-20240307", name: "Claude 3 Haiku", provider: "anthropic", providerName: "Anthropic" },
+  { id: "claude-sonnet-4-20250514", name: "Claude Sonnet 4", provider: "anthropic", providerName: "Anthropic" },
+  { id: "claude-3-7-sonnet-20250219", name: "Claude 3.7 Sonnet", provider: "anthropic", providerName: "Anthropic" },
+  { id: "claude-3-5-sonnet-20241022", name: "Claude 3.5 Sonnet", provider: "anthropic", providerName: "Anthropic" },
+  { id: "claude-3-opus-20240229", name: "Claude 3 Opus", provider: "anthropic", providerName: "Anthropic" },
+  { id: "claude-3-sonnet-20240229", name: "Claude 3 Sonnet", provider: "anthropic", providerName: "Anthropic" },
+  { id: "claude-3-haiku-20240307", name: "Claude 3 Haiku", provider: "anthropic", providerName: "Anthropic" },
   
   // DeepSeek
-  { id: "deepseek/deepseek-chat", name: "DeepSeek Chat", provider: "deepseek", providerName: "DeepSeek", baseURL: "https://api.deepseek.com/v1" },
-  { id: "deepseek/deepseek-coder", name: "DeepSeek Coder", provider: "deepseek", providerName: "DeepSeek", baseURL: "https://api.deepseek.com/v1" },
+  { id: "deepseek-chat", name: "DeepSeek Chat", provider: "deepseek", providerName: "DeepSeek", baseURL: "https://api.deepseek.com/v1" },
+  { id: "deepseek-coder", name: "DeepSeek Coder", provider: "deepseek", providerName: "DeepSeek", baseURL: "https://api.deepseek.com/v1" },
+  { id: "deepseek-reasoner", name: "DeepSeek R1", provider: "deepseek", providerName: "DeepSeek", baseURL: "https://api.deepseek.com/v1" },
   
   // Qwen
-  { id: "qwen/qwen-turbo", name: "Qwen Turbo", provider: "qwen", providerName: "Qwen", baseURL: "https://dashscope.aliyuncs.com/compatible-mode/v1" },
-  { id: "qwen/qwen-plus", name: "Qwen Plus", provider: "qwen", providerName: "Qwen", baseURL: "https://dashscope.aliyuncs.com/compatible-mode/v1" },
-  { id: "qwen/qwen-max", name: "Qwen Max", provider: "qwen", providerName: "Qwen", baseURL: "https://dashscope.aliyuncs.com/compatible-mode/v1" },
+  { id: "qwen-turbo", name: "Qwen Turbo", provider: "qwen", providerName: "Qwen", baseURL: "https://dashscope.aliyuncs.com/compatible-mode/v1" },
+  { id: "qwen-plus", name: "Qwen Plus", provider: "qwen", providerName: "Qwen", baseURL: "https://dashscope.aliyuncs.com/compatible-mode/v1" },
+  { id: "qwen-max", name: "Qwen Max", provider: "qwen", providerName: "Qwen", baseURL: "https://dashscope.aliyuncs.com/compatible-mode/v1" },
   
   // LM Studio (common local models)
-  { id: "lmstudio/gpt-3.5-turbo", name: "GPT-3.5 Turbo (Local)", provider: "lmstudio", providerName: "LM Studio", baseURL: "http://127.0.0.1:1234/v1" },
-  { id: "lmstudio/llama-2-7b-chat", name: "Llama 2 7B Chat (Local)", provider: "lmstudio", providerName: "LM Studio", baseURL: "http://127.0.0.1:1234/v1" },
-  { id: "lmstudio/mistral-7b-instruct", name: "Mistral 7B Instruct (Local)", provider: "lmstudio", providerName: "LM Studio", baseURL: "http://127.0.0.1:1234/v1" },
-  { id: "lmstudio/custom", name: "Custom Model (Local)", provider: "lmstudio", providerName: "LM Studio", baseURL: "http://127.0.0.1:1234/v1" },
+  { id: "gpt-3.5-turbo", name: "GPT-3.5 Turbo (Local)", provider: "lmstudio", providerName: "LM Studio", baseURL: "http://127.0.0.1:1234/v1" },
+  { id: "llama-2-7b-chat", name: "Llama 2 7B Chat (Local)", provider: "lmstudio", providerName: "LM Studio", baseURL: "http://127.0.0.1:1234/v1" },
+  { id: "mistral-7b-instruct", name: "Mistral 7B Instruct (Local)", provider: "lmstudio", providerName: "LM Studio", baseURL: "http://127.0.0.1:1234/v1" },
+  { id: "custom", name: "Custom Model (Local)", provider: "lmstudio", providerName: "LM Studio", baseURL: "http://127.0.0.1:1234/v1" },
   
   // Together AI
-  { id: "together/meta-llama/Llama-2-70b-chat-hf", name: "Llama 2 70B Chat", provider: "together", providerName: "Together AI", baseURL: "https://api.together.xyz/v1" },
-  { id: "together/mistralai/Mixtral-8x7B-Instruct-v0.1", name: "Mixtral 8x7B Instruct", provider: "together", providerName: "Together AI", baseURL: "https://api.together.xyz/v1" },
+  { id: "meta-llama/Llama-2-70b-chat-hf", name: "Llama 2 70B Chat", provider: "together", providerName: "Together AI", baseURL: "https://api.together.xyz/v1" },
+  { id: "mistralai/Mixtral-8x7B-Instruct-v0.1", name: "Mixtral 8x7B Instruct", provider: "together", providerName: "Together AI", baseURL: "https://api.together.xyz/v1" },
   
   // Groq
-  { id: "groq/llama-3-70b-8192", name: "Llama 3 70B", provider: "groq", providerName: "Groq", baseURL: "https://api.groq.com/openai/v1" },
-  { id: "groq/mixtral-8x7b-32768", name: "Mixtral 8x7B", provider: "groq", providerName: "Groq", baseURL: "https://api.groq.com/openai/v1" },
+  { id: "llama-3-70b-8192", name: "Llama 3 70B", provider: "groq", providerName: "Groq", baseURL: "https://api.groq.com/openai/v1" },
+  { id: "mixtral-8x7b-32768", name: "Mixtral 8x7B", provider: "groq", providerName: "Groq", baseURL: "https://api.groq.com/openai/v1" },
 ];
 
 /**
@@ -169,20 +175,10 @@ export function getModelById(modelId: string): ModelInfo | null {
   let model = MODELS.find((m) => m.id === modelId);
   if (model) return model;
 
-  // Try matching without provider prefix
-  if (!modelId.includes("/")) {
-    model = MODELS.find((m) => {
-      const parts = m.id.split("/");
-      return parts[parts.length - 1] === modelId;
-    });
-    if (model) return model;
-  } else {
-    // Try matching just the model part
+  // Try matching without provider prefix (for backwards compatibility)
+  if (modelId.includes("/")) {
     const modelPart = modelId.split("/").slice(-1)[0];
-    model = MODELS.find((m) => {
-      const parts = m.id.split("/");
-      return parts[parts.length - 1] === modelPart;
-    });
+    model = MODELS.find((m) => m.id === modelPart);
     if (model) return model;
   }
 
@@ -197,8 +193,8 @@ export function getModelSDKConfig(model: ModelInfo): {
   baseURL?: string;
   modelId: string;
 } {
-  // Extract model name (without provider prefix)
-  const modelName = model.id.split("/").slice(1).join("/");
+  // The model ID is used directly (no provider prefix needed for native SDKs)
+  const modelName = model.id;
 
   // Native providers
   if (model.provider === "openai") {
@@ -237,4 +233,3 @@ function getProviderBaseURL(providerId: string): string {
   const provider = PROVIDERS.find((p) => p.id === providerId);
   return provider?.baseURL || "";
 }
-

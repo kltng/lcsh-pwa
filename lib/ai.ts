@@ -21,6 +21,7 @@ export interface GenerateOptions {
   apiKey: string;
   bibliographicInfo: BibliographicInfo;
   systemPromptRules?: string;
+  provider?: string | null; // Selected provider to ensure correct model lookup
 }
 
 export interface MarcGenerationOptions {
@@ -34,6 +35,7 @@ export interface MarcGenerationOptions {
     };
     apiId?: string;
   }>;
+  provider?: string | null; // Selected provider to ensure correct model lookup
 }
 
 export interface AIResponse {
@@ -48,7 +50,7 @@ export interface AIResponse {
 /**
  * Generate LCSH suggestions using the configured AI model
  */
-export async function generateLcshSuggestions (
+export async function generateLcshSuggestions(
   options: GenerateOptions
 ): Promise<AIResponse> {
   const response = await fetch("/api/generate", {
@@ -62,6 +64,7 @@ export async function generateLcshSuggestions (
       bibliographicInfo: options.bibliographicInfo,
       systemPromptRules: options.systemPromptRules || "",
       promptType: "suggestions",
+      provider: options.provider, // Pass provider to ensure correct model lookup
     }),
   });
 
@@ -76,7 +79,7 @@ export async function generateLcshSuggestions (
 /**
  * Generate MARC records for validated LCSH terms
  */
-export async function generateMarcRecords (
+export async function generateMarcRecords(
   options: MarcGenerationOptions
 ): Promise<AIResponse> {
   const response = await fetch("/api/generate", {
@@ -89,6 +92,7 @@ export async function generateMarcRecords (
       apiKey: options.apiKey,
       recommendations: options.recommendations,
       promptType: "marc",
+      provider: options.provider, // Pass provider to ensure correct model lookup
     }),
   });
 
@@ -117,7 +121,7 @@ export interface ParsedSuggestions {
   rawResponse: string;
 }
 
-export function parseLcshSuggestions (response: AIResponse): ParsedSuggestions {
+export function parseLcshSuggestions(response: AIResponse): ParsedSuggestions {
   const content = response.text;
 
   // Extract subject analysis - handle both ### and #### headers
@@ -235,7 +239,7 @@ export function parseLcshSuggestions (response: AIResponse): ParsedSuggestions {
 /**
  * Parse MARC records from AI response
  */
-export function parseMarcRecords (
+export function parseMarcRecords(
   response: AIResponse,
   terms: string[]
 ): Record<string, string> {
@@ -256,5 +260,3 @@ export function parseMarcRecords (
 
   return marcRecords;
 }
-
-
