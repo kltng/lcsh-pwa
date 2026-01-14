@@ -115,7 +115,7 @@ export default function SettingsPage() {
 
       console.log("Testing connection with:", { provider, modelId, apiKeyLength: apiKey.length });
 
-      // Test with a simple query
+      // Test with a simple query - MUST include provider for correct model lookup
       const result = await generateLcshSuggestions({
         modelId,
         apiKey,
@@ -123,6 +123,7 @@ export default function SettingsPage() {
           title: "Test",
         },
         systemPromptRules: systemPromptRules || "",
+        provider, // Critical: pass provider to ensure correct model is used
       });
 
       console.log("Test connection successful:", result);
@@ -313,5 +314,3 @@ export default function SettingsPage() {
     </div>
   );
 }
-
-

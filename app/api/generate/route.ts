@@ -3,8 +3,8 @@ import { generateText, generateObject } from "ai";
 import { createOpenAI } from "@ai-sdk/openai";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { createAnthropic } from "@ai-sdk/anthropic";
-import { getModelById, getModelSDKConfig, getAllModels } from "@/lib/models";
-import { searchLcsh, searchLcnaf, type LcshResult } from "@/lib/lcsh";
+import { getModelsByProvider, getModelSDKConfig, getAllModels } from "@/lib/models";
+import { searchLcsh, type LcshResult } from "@/lib/lcsh";
 import { calculateSimilarity } from "@/lib/similarity";
 import { z } from "zod";
 
@@ -35,6 +35,7 @@ export async function POST(request: NextRequest) {
       systemPromptRules,
       promptType = "suggestions", // "suggestions" or "marc"
       recommendations, // For MARC generation
+      provider, // Selected provider from settings - CRITICAL for correct model lookup
     } = body;
 
     if (!modelId) {
@@ -44,32 +45,55 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    if (!provider) {
+      return NextResponse.json(
+        { error: "provider is required - please select a provider in settings" },
+        { status: 400 }
+      );
+    }
+
     const finalApiKey = apiKey || "";
 
-    // Get model info
-    console.log("Looking up model:", modelId);
-    const modelInfo = await getModelById(modelId);
-    console.log("Model info found:", modelInfo ? { id: modelInfo.id, name: modelInfo.name, provider: modelInfo.provider } : null);
+    // Get model info - MUST filter by provider to ensure we get the correct model
+    // Multiple providers (e.g., "google", "firmware", "vercel") may host the same model
+    // We need to use the model from the provider the user selected
+    console.log("Looking up model:", modelId, "from provider:", provider);
+    
+    // Get all models for the selected provider and find the matching model
+    const providerModels = await getModelsByProvider(provider);
+    const modelInfo = providerModels.find((m) => m.id === modelId);
+    
+    console.log("Model info found:", modelInfo ? { 
+      id: modelInfo.id, 
+      name: modelInfo.name, 
+      provider: modelInfo.provider,
+      providerName: modelInfo.providerName 
+    } : null);
 
     if (!modelInfo) {
-      const allModels = await getAllModels();
-      const similarModels = allModels
-        .filter(m => m.id.toLowerCase().includes(modelId.toLowerCase()) || modelId.toLowerCase().includes(m.id.toLowerCase()))
-        .slice(0, 5)
-        .map(m => m.id);
-
+      // Provide helpful error with available models from the selected provider
+      const availableModels = providerModels.slice(0, 5).map(m => m.id);
+      
       return NextResponse.json(
         {
-          error: `Model ${modelId} not found`,
-          suggestion: similarModels.length > 0 ? `Did you mean one of these: ${similarModels.join(", ")}?` : undefined
+          error: `Model ${modelId} not found for provider ${provider}`,
+          suggestion: availableModels.length > 0 
+            ? `Available models from ${provider}: ${availableModels.join(", ")}` 
+            : `No models found for provider ${provider}`
         },
         { status: 404 }
       );
     }
 
-    // Get SDK config
+    // Get SDK config - this determines which AI SDK to use
     const sdkConfig = getModelSDKConfig(modelInfo);
     const modelName = sdkConfig.modelId;
+
+    console.log("Using SDK config:", { 
+      sdkProvider: sdkConfig.provider, 
+      modelName, 
+      baseURL: sdkConfig.baseURL 
+    });
 
     let model: any;
     if (sdkConfig.provider === "openai") {

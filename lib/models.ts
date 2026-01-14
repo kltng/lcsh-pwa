@@ -75,7 +75,7 @@ const CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours
 
 /**
  * Fetch models from models.dev API
- * Uses our API route on client-side, direct fetch on server-side
+ * Uses direct fetch on server-side, API route on client-side to avoid CORS
  */
 export async function fetchModelsDev (): Promise<ModelsDevResponse> {
   try {
@@ -86,7 +86,8 @@ export async function fetchModelsDev (): Promise<ModelsDevResponse> {
       url = "https://models.dev/api.json";
     } else {
       // Client-side: use our API route to avoid CORS
-      url = `${window.location.origin}/api/models`;
+      const baseUrl = window.location.origin;
+      url = `${baseUrl}/api/models`;
     }
 
     const response = await fetch(url, {
@@ -94,6 +95,7 @@ export async function fetchModelsDev (): Promise<ModelsDevResponse> {
       headers: {
         "Content-Type": "application/json",
       },
+      cache: "default",
     });
 
     if (!response.ok) {
@@ -105,8 +107,19 @@ export async function fetchModelsDev (): Promise<ModelsDevResponse> {
     return await response.json();
   } catch (error) {
     console.error("Error fetching models.dev:", error);
-    // Re-throw the error so callers can handle it (e.g., fallback to local registry)
-    // Don't wrap it in a new error as that breaks error handling upstream
+    // Provide more helpful error message
+    if (error instanceof TypeError) {
+      if (error.message.includes("Failed to parse URL")) {
+        throw new Error(
+          "Failed to parse API URL. This may be a browser compatibility issue."
+        );
+      }
+      if (error.message.includes("fetch")) {
+        throw new Error(
+          "Network error. Please check your internet connection and try again."
+        );
+      }
+    }
     throw error;
   }
 }
@@ -141,8 +154,6 @@ export async function getProviders (): Promise<ProviderInfo[]> {
       }
 
       if (providers.length > 0) {
-        // Sort providers alphabetically by name
-        providers.sort((a, b) => a.name.localeCompare(b.name));
         cachedProviders = providers;
         cacheTimestamp = now;
         return providers;
@@ -160,14 +171,13 @@ export async function getProviders (): Promise<ProviderInfo[]> {
     api: p.baseURL,
     env: p.apiKeyEnv ? [p.apiKeyEnv] : undefined,
   }));
-  // Sort local providers alphabetically as well
-  cachedProviders.sort((a, b) => a.name.localeCompare(b.name));
   cacheTimestamp = now;
   return cachedProviders;
 }
 
 /**
  * Get all models from models.dev, grouped by provider
+ * Falls back to local registry if models.dev is unavailable
  */
 export async function getAllModels (): Promise<ModelInfo[]> {
   const now = Date.now();
@@ -190,24 +200,14 @@ export async function getAllModels (): Promise<ModelInfo[]> {
       if (!providerData.models) continue;
 
       for (const [modelId, modelData] of Object.entries(providerData.models)) {
-        // Construct the full model ID with provider prefix
-        // If modelData.id exists, check if it already has a provider prefix
-        let fullModelId: string;
-        if (modelData.id) {
-          if (modelData.id.includes("/")) {
-            // Already has provider prefix (e.g., "openai/gpt-oss-20b")
-            fullModelId = modelData.id;
-          } else {
-            // No prefix, add provider prefix (e.g., "gemini-2.5-flash" -> "google/gemini-2.5-flash")
-            fullModelId = `${providerId}/${modelData.id}`;
-          }
-        } else {
-          // Use the key as the model name
-          fullModelId = `${providerId}/${modelId}`;
-        }
+        // Use the model's id if it exists, otherwise construct it
+        const fullModelId = modelData.id || `${providerId}/${modelId}`;
 
+        // For models where the ID already includes a provider prefix (like "openai/gpt-oss-20b"),
+        // we still want to track which provider (like "lmstudio") is hosting it
+        // But we use the model's own ID for lookup
         models.push({
-          id: fullModelId, // Always includes provider prefix for consistent lookup
+          id: fullModelId, // This is what we'll use for lookup
           name: modelData.name || modelId,
           provider: providerId, // The hosting provider (e.g., "lmstudio")
           providerName: providerData.name,
@@ -230,12 +230,9 @@ export async function getAllModels (): Promise<ModelInfo[]> {
       }
     }
 
-    // Filter out deprecated models
-    const filteredModels = models.filter((m) => m.status !== "deprecated");
-
-    cachedModels = filteredModels;
+    cachedModels = models;
     cacheTimestamp = now;
-    return filteredModels;
+    return models;
   } catch (error) {
     console.warn("Failed to fetch from models.dev, using local registry:", error);
     // Fallback to local registry
@@ -335,53 +332,36 @@ export function getModelSDKConfig (model: ModelInfo): {
     return getLocalModelSDKConfig(localModel);
   }
 
-  // Extract model name from ID
-  const idParts = model.id.split("/");
-  const idPrefix = idParts[0].toLowerCase();
-  const modelName = idParts.length > 1 ? idParts.slice(1).join("/") : model.id;
+  // Fallback to original logic
+  // Extract model name - handle both "provider/model" and "model" formats
+  const modelName = model.id.includes("/") 
+    ? model.id.split("/").slice(1).join("/") 
+    : model.id;
 
-  // List of aggregator providers that don't have their own API
-  // For these, we need to check the model ID prefix to determine the actual SDK
-  const aggregatorProviders = ["vercel", "openrouter"];
-
-  // List of providers that use OpenAI-compatible API
-  const openaiCompatibleProviders = [
-    "groq", "together", "deepseek", "qwen", "perplexity",
-    "lmstudio", "cerebras", "fireworks", "mistral"
-  ];
-
-  // 1. First check if model.provider is a native SDK provider
+  // Check if it's a native provider
   if (model.provider === "openai") {
-    return { provider: "openai", modelId: modelName };
-  }
-  if (model.provider === "google") {
-    return { provider: "google", modelId: modelName };
-  }
-  if (model.provider === "anthropic") {
-    return { provider: "anthropic", modelId: modelName };
-  }
-
-  // 2. If provider is an aggregator, check the ID prefix to determine SDK
-  if (aggregatorProviders.includes(model.provider.toLowerCase())) {
-    if (idPrefix === "openai") {
-      return { provider: "openai", modelId: modelName };
-    }
-    if (idPrefix === "google") {
-      return { provider: "google", modelId: modelName };
-    }
-    if (idPrefix === "anthropic") {
-      return { provider: "anthropic", modelId: modelName };
-    }
-    // For aggregators with non-native model prefixes, use OpenAI-compatible
     return {
-      provider: "openai-compatible",
-      baseURL: model.baseURL || getDefaultBaseURL(model.provider),
+      provider: "openai",
       modelId: modelName,
     };
   }
 
-  // 3. For OpenAI-compatible providers (Groq, Together, DeepSeek, etc.)
-  // Use their specific baseURL, not OpenAI's
+  if (model.provider === "google") {
+    return {
+      provider: "google",
+      modelId: modelName,
+    };
+  }
+
+  if (model.provider === "anthropic") {
+    return {
+      provider: "anthropic",
+      modelId: modelName,
+    };
+  }
+
+  // For OpenAI-compatible providers (including LM Studio, DeepSeek, Qwen, etc.)
+
   return {
     provider: "openai-compatible",
     baseURL: model.baseURL || getDefaultBaseURL(model.provider),
