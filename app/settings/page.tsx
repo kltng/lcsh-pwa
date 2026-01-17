@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useAppStore } from "@/lib/store";
-import { getProviders, getModelsByProvider, type ProviderInfo, type ModelInfo } from "@/lib/models";
+import { getProviders, getModelsByProvider, type ProviderInfo, type ModelInfo } from "@/lib/model-registry";
 import { generateLcshSuggestions } from "@/lib/ai";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";

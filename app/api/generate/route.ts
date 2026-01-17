@@ -3,7 +3,7 @@ import { generateText, generateObject } from "ai";
 import { createOpenAI } from "@ai-sdk/openai";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { createAnthropic } from "@ai-sdk/anthropic";
-import { getModelsByProvider, getModelSDKConfig, getAllModels } from "@/lib/models";
+import { getModelsByProvider, getModelSDKConfig, getAllModels } from "@/lib/model-registry";
 import { searchLcsh, type LcshResult } from "@/lib/lcsh";
 import { calculateSimilarity } from "@/lib/similarity";
 import { z } from "zod";
