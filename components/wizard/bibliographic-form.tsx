@@ -21,8 +21,10 @@ export function BibliographicForm({ onValidatedTerms }: BibliographicFormProps) 
     setBibliographicInfo,
     systemPromptRules,
     apiKey,
+    apiKeys,
     modelId,
     provider, // Get provider from store to pass to API
+    getApiKeyForProvider,
     setActiveStep,
     setIsLoading,
     isLoading,
@@ -112,13 +114,20 @@ export function BibliographicForm({ onValidatedTerms }: BibliographicFormProps) 
       return false;
     }
 
-    if (!modelId || !apiKey) {
-      setError("Please configure your AI model and API key in Settings");
+    if (!modelId) {
+      setError("Please configure your AI model in Settings");
       return false;
     }
 
     if (!provider) {
       setError("Please select a provider in Settings");
+      return false;
+    }
+
+    // Check for API key (either from apiKeys array or deprecated apiKey)
+    const hasApiKey = provider === "lmstudio" || getApiKeyForProvider(provider) || apiKey;
+    if (!hasApiKey) {
+      setError("Please add an API key for this provider in Settings");
       return false;
     }
 
@@ -152,7 +161,8 @@ export function BibliographicForm({ onValidatedTerms }: BibliographicFormProps) 
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           modelId,
-          apiKey,
+          apiKey, // Keep for backward compatibility
+          apiKeys: apiKeys.filter((k) => k.provider === provider), // Send apiKeys array
           bibliographicInfo: enhancedBibliographicInfo,
           systemPromptRules: systemPromptRules || "",
           promptType: "suggestions",

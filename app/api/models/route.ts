@@ -1,12 +1,16 @@
 import { NextResponse } from "next/server";
 
 export async function GET() {
+  if (process.env.USE_MODELS_DEV !== "true") {
+    return NextResponse.json({}, { status: 200 });
+  }
+
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 second timeout
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
 
     const response = await fetch("https://models.dev/api.json", {
-      next: { revalidate: 3600 }, // Cache for 1 hour
+      next: { revalidate: 3600 },
       signal: controller.signal,
     });
 
@@ -20,10 +24,6 @@ export async function GET() {
     return NextResponse.json(data);
   } catch (error) {
     console.error("Error fetching models.dev:", error);
-    
-    // Return empty object instead of error to allow fallback to local registry
-    // The client-side code will handle the empty response and use local registry
     return NextResponse.json({}, { status: 200 });
   }
 }
-
