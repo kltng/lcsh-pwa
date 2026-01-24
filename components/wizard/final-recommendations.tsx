@@ -24,8 +24,6 @@ export function FinalRecommendations() {
     apiKey,
     modelId,
     provider, // Get provider from store to pass to API
-    isLoading,
-    setIsLoading,
     error,
     setError,
   } = useAppStore();
@@ -288,5 +286,3 @@ export function FinalRecommendations() {
     </div>
   );
 }
-
-

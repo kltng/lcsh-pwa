@@ -83,21 +83,43 @@ export async function searchLcsh(query: string, options: SearchOptions = {}): Pr
     }
 
     try {
+        // Add timeout to prevent hanging requests
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+
         const response = await fetch(`${url}?${params.toString()}`, {
             headers: {
                 "User-Agent": "cataloging-assistant/1.0",
             },
             next: { revalidate: 3600 },
+            signal: controller.signal,
         });
 
+        clearTimeout(timeoutId);
+
         if (!response.ok) {
+            console.error(`LOC API returned ${response.status}: ${response.statusText} for query: ${query}`);
             throw new Error(`LOC API returned ${response.status}: ${response.statusText}`);
         }
 
         const data = await response.json();
-        return parseLocResponse(data);
+        const results = parseLocResponse(data);
+        console.log(`LCSH search for "${query}" returned ${results.length} results`);
+        return results;
     } catch (error) {
         console.error("Error searching LCSH:", error);
+        // If it's a timeout, DNS error, or network error, return empty array instead of throwing
+        if (error instanceof Error && (
+            error.name === 'AbortError' || 
+            error.message.includes('fetch failed') || 
+            error.message.includes('ETIMEDOUT') ||
+            error.message.includes('ENOTFOUND') ||
+            error.message.includes('getaddrinfo') ||
+            error.message.includes('Could not resolve host')
+        )) {
+            console.warn(`LCSH search failed for "${query}" (timeout/network/DNS error), returning empty results`);
+            return [];
+        }
         throw error;
     }
 }
@@ -116,21 +138,43 @@ export async function searchLcnaf(query: string, options: SearchOptions = {}): P
     });
 
     try {
+        // Add timeout to prevent hanging requests
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+
         const response = await fetch(`${url}?${params.toString()}`, {
             headers: {
                 "User-Agent": "cataloging-assistant/1.0",
             },
             next: { revalidate: 3600 },
+            signal: controller.signal,
         });
 
+        clearTimeout(timeoutId);
+
         if (!response.ok) {
+            console.error(`LCNAF API returned ${response.status}: ${response.statusText} for query: ${query}`);
             throw new Error(`LOC API returned ${response.status}: ${response.statusText}`);
         }
 
         const data = await response.json();
-        return parseLocResponse(data);
+        const results = parseLocResponse(data);
+        console.log(`LCNAF search for "${query}" returned ${results.length} results`);
+        return results;
     } catch (error) {
         console.error("Error searching LCNAF:", error);
+        // If it's a timeout, DNS error, or network error, return empty array instead of throwing
+        if (error instanceof Error && (
+            error.name === 'AbortError' || 
+            error.message.includes('fetch failed') || 
+            error.message.includes('ETIMEDOUT') ||
+            error.message.includes('ENOTFOUND') ||
+            error.message.includes('getaddrinfo') ||
+            error.message.includes('Could not resolve host')
+        )) {
+            console.warn(`LCNAF search failed for "${query}" (timeout/network/DNS error), returning empty results`);
+            return [];
+        }
         throw error;
     }
 }

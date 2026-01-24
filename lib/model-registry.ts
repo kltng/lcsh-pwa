@@ -147,30 +147,30 @@ export const MODELS: ModelInfo[] = [
 ];
 
 /**
- * Get all providers
+ * Get all providers (local registry - fallback)
  */
-export function getProviders(): ProviderInfo[] {
+export function getLocalProviders(): ProviderInfo[] {
   return PROVIDERS;
 }
 
 /**
- * Get all models
+ * Get all models (local registry - fallback)
  */
-export function getAllModels(): ModelInfo[] {
+export function getLocalModels(): ModelInfo[] {
   return MODELS;
 }
 
 /**
- * Get models for a specific provider
+ * Get models for a specific provider (local registry - fallback)
  */
-export function getModelsByProvider(providerId: string): ModelInfo[] {
+export function getLocalModelsByProvider(providerId: string): ModelInfo[] {
   return MODELS.filter((m) => m.provider === providerId);
 }
 
 /**
- * Get a specific model by ID
+ * Get a specific model by ID (local registry - fallback)
  */
-export function getModelById(modelId: string): ModelInfo | null {
+export function getLocalModelById(modelId: string): ModelInfo | null {
   // Try exact match first
   let model = MODELS.find((m) => m.id === modelId);
   if (model) return model;
@@ -186,6 +186,34 @@ export function getModelById(modelId: string): ModelInfo | null {
 }
 
 /**
+ * @deprecated Use getLocalProviders() instead
+ */
+export function getProviders(): ProviderInfo[] {
+  return getLocalProviders();
+}
+
+/**
+ * @deprecated Use getLocalModels() instead
+ */
+export function getAllModels(): ModelInfo[] {
+  return getLocalModels();
+}
+
+/**
+ * @deprecated Use getLocalModelsByProvider() instead
+ */
+export function getModelsByProvider(providerId: string): ModelInfo[] {
+  return getLocalModelsByProvider(providerId);
+}
+
+/**
+ * @deprecated Use getLocalModelById() instead
+ */
+export function getModelById(modelId: string): ModelInfo | null {
+  return getLocalModelById(modelId);
+}
+
+/**
  * Get SDK configuration for a model
  */
 export function getModelSDKConfig(model: ModelInfo): {
@@ -193,8 +221,10 @@ export function getModelSDKConfig(model: ModelInfo): {
   baseURL?: string;
   modelId: string;
 } {
-  // The model ID is used directly (no provider prefix needed for native SDKs)
-  const modelName = model.id;
+  const prefix = `${model.provider}/`;
+  const modelName = model.id.startsWith(prefix)
+    ? model.id.slice(prefix.length)
+    : model.id;
 
   // Native providers
   if (model.provider === "openai") {

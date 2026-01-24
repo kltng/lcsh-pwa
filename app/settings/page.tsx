@@ -1,9 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useAppStore } from "@/lib/store";
-import { getProviders, getModelsByProvider, type ProviderInfo, type ModelInfo } from "@/lib/model-registry";
-import { generateLcshSuggestions } from "@/lib/ai";
+import { useAppStore, type ApiKey } from "@/lib/store";
+import { Badge } from "@/components/ui/badge";
+import { getProviders, getModelsByProvider, type ExtendedProviderInfo, type ExtendedModelInfo } from "@/lib/models";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -23,22 +23,28 @@ export default function SettingsPage() {
   const {
     provider,
     modelId,
-    apiKey,
+    apiKeys,
     systemPromptRules,
     setProvider,
     setModelId,
-    setApiKey,
     setSystemPromptRules,
     resetSystemPromptRules,
+    addApiKey,
+    removeApiKey,
+    setDefaultApiKey,
+    getApiKeyForProvider,
   } = useAppStore();
 
-  const [providers, setProviders] = useState<ProviderInfo[]>([]);
-  const [models, setModels] = useState<ModelInfo[]>([]);
+  const [providers, setProviders] = useState<ExtendedProviderInfo[]>([]);
+  const [models, setModels] = useState<ExtendedModelInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingModels, setLoadingModels] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
+  const [newApiKey, setNewApiKey] = useState("");
+  const [newKeyLabel, setNewKeyLabel] = useState("");
+  const [providerApiKeys, setProviderApiKeys] = useState<ApiKey[]>([]);
 
   useEffect(() => {
     // Only run on client side
@@ -50,11 +56,15 @@ export default function SettingsPage() {
   useEffect(() => {
     if (provider) {
       loadModels(provider);
+      // Load API keys for this provider
+      const keys = apiKeys.filter((k) => k.provider === provider);
+      setProviderApiKeys(keys);
     } else {
       setModels([]);
       setModelId(null);
+      setProviderApiKeys([]);
     }
-  }, [provider]);
+  }, [provider, apiKeys]);
 
   async function loadProviders() {
     try {
@@ -90,6 +100,33 @@ export default function SettingsPage() {
     }
   }
 
+  function handleAddKey() {
+    if (!provider || !newApiKey.trim()) return;
+
+    addApiKey({
+      provider,
+      key: newApiKey.trim(),
+      label: newKeyLabel.trim() || undefined,
+    });
+
+    setNewApiKey("");
+    setNewKeyLabel("");
+    const keys = useAppStore.getState().apiKeys.filter((k) => k.provider === provider);
+    setProviderApiKeys(keys);
+  }
+
+  function handleRemoveKey(keyId: string) {
+    removeApiKey(keyId);
+    const keys = useAppStore.getState().apiKeys.filter((k) => k.provider === provider);
+    setProviderApiKeys(keys);
+  }
+
+  function handleSetDefault(keyId: string) {
+    setDefaultApiKey(keyId);
+    const keys = useAppStore.getState().apiKeys.filter((k) => k.provider === provider);
+    setProviderApiKeys(keys);
+  }
+
   async function testConnection() {
     if (!provider || !modelId) {
       setTestResult({
@@ -99,12 +136,13 @@ export default function SettingsPage() {
       return;
     }
 
-    // API key is optional for some providers (like LM Studio)
-    // But we'll still validate it's provided for most providers
-    if (!apiKey && provider !== "lmstudio") {
+    // Use API key from apiKeys array only (legacy apiKey removed from UI)
+    const testApiKey = getApiKeyForProvider(provider);
+
+    if (!testApiKey && provider !== "lmstudio") {
       setTestResult({
         success: false,
-        message: "Please enter an API key (optional for LM Studio)",
+        message: "Please add an API key for this provider (optional for LM Studio)",
       });
       return;
     }
@@ -113,20 +151,29 @@ export default function SettingsPage() {
       setTesting(true);
       setTestResult(null);
 
-      console.log("Testing connection with:", { provider, modelId, apiKeyLength: apiKey.length });
+      console.log("Testing connection with:", { provider, modelId });
 
-      // Test with a simple query - MUST include provider for correct model lookup
-      const result = await generateLcshSuggestions({
-        modelId,
-        apiKey,
-        bibliographicInfo: {
-          title: "Test",
+      // Simple connection test - just verify API key and model work
+      const response = await fetch("/api/test-connection", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
         },
-        systemPromptRules: systemPromptRules || "",
-        provider, // Critical: pass provider to ensure correct model is used
+        body: JSON.stringify({
+          modelId,
+          provider,
+          apiKey: testApiKey,
+          apiKeys: apiKeys.filter((k) => k.provider === provider),
+        }),
       });
 
-      console.log("Test connection successful:", result);
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Connection test failed");
+      }
+
+      console.log("Test connection successful:", data);
 
       setTestResult({
         success: true,
@@ -141,9 +188,9 @@ export default function SettingsPage() {
         // Provide more helpful error messages
         if (error.message.includes("not found")) {
           errorMessage = `Model not found: ${modelId}. Please select a different model.`;
-        } else if (error.message.includes("401") || error.message.includes("Unauthorized")) {
+        } else if (error.message.includes("401") || error.message.includes("Invalid API key")) {
           errorMessage = "Invalid API key. Please check your API key and try again.";
-        } else if (error.message.includes("403") || error.message.includes("Forbidden")) {
+        } else if (error.message.includes("403") || error.message.includes("permission")) {
           errorMessage = "API key does not have permission to access this model.";
         } else if (error.message.includes("429") || error.message.includes("rate limit")) {
           errorMessage = "Rate limit exceeded. Please try again later.";
@@ -166,7 +213,7 @@ export default function SettingsPage() {
       <div className="mb-8">
         <h1 className="text-3xl font-bold">Settings</h1>
         <p className="text-muted-foreground mt-2">
-          Configure your AI model provider and API key for LCSH recommendations
+          Configure your AI model provider and model for LCSH recommendations
         </p>
       </div>
 
@@ -182,7 +229,7 @@ export default function SettingsPage() {
           <CardHeader>
             <CardTitle>AI Model Configuration</CardTitle>
             <CardDescription>
-              Select your preferred AI model provider and model. The API key is stored locally in your browser.
+              Select your preferred AI model provider and model. Your API key is stored locally in your browser.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -249,21 +296,83 @@ export default function SettingsPage() {
               </div>
             )}
 
-            <div className="space-y-2">
-              <Label htmlFor="apiKey">API Key</Label>
-              <Input
-                id="apiKey"
-                type="password"
-                value={apiKey}
-                onChange={(e) => setApiKey(e.target.value)}
-                placeholder="Enter your API key"
-              />
-              <p className="text-sm text-muted-foreground">
-                Your API key is stored locally and never sent to our servers
-              </p>
-            </div>
+            {provider && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>API Keys for {providers.find((p) => p.id === provider)?.name}</CardTitle>
+                  <CardDescription>
+                    Manage multiple API keys for this provider. The default key will be used automatically.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {/* Add new key form */}
+                  <div className="flex gap-2">
+                    <Input
+                      placeholder="Enter API key"
+                      value={newApiKey}
+                      onChange={(e) => setNewApiKey(e.target.value)}
+                      type="password"
+                      className="flex-1"
+                    />
+                    <Input
+                      placeholder="Label (optional)"
+                      value={newKeyLabel}
+                      onChange={(e) => setNewKeyLabel(e.target.value)}
+                      className="flex-1"
+                    />
+                    <Button onClick={handleAddKey} disabled={!newApiKey.trim()}>
+                      Add
+                    </Button>
+                  </div>
 
-            <Button onClick={testConnection} disabled={testing || !provider || !modelId || !apiKey}>
+                  {/* List existing keys */}
+                  {providerApiKeys.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">
+                      No API keys added yet. Add one above to get started.
+                    </p>
+                  ) : (
+                    <div className="space-y-2">
+                      {providerApiKeys.map((key) => (
+                        <div
+                          key={key.id}
+                          className="flex items-center gap-2 p-3 border rounded-lg"
+                        >
+                          <div className="flex-1">
+                            <div className="font-medium">
+                              {key.label || `Key ${key.id.slice(-4)}`}
+                            </div>
+                            <div className="text-sm text-muted-foreground">
+                              {key.key.slice(0, 8)}...{key.key.slice(-4)}
+                            </div>
+                          </div>
+                          {key.isDefault && (
+                            <Badge variant="secondary">Default</Badge>
+                          )}
+                          {!key.isDefault && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleSetDefault(key.id)}
+                            >
+                              Set Default
+                            </Button>
+                          )}
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleRemoveKey(key.id)}
+                          >
+                            Remove
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+
+            <Button onClick={testConnection} disabled={testing || !provider || !modelId || (!getApiKeyForProvider(provider) && provider !== "lmstudio")}>
               {testing ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />

@@ -50,7 +50,7 @@ export default function HomePage() {
           <Settings className="h-8 w-8 mb-2 text-primary" />
           <CardTitle>Settings</CardTitle>
           <CardDescription>
-            Configure your AI model provider and API key
+            Configure your AI model provider and model
           </CardDescription>
         </CardHeader>
         <CardContent>

@@ -47,17 +47,34 @@ export interface Conversation {
   marcRecords?: Record<string, string>;
 }
 
+// API Key interface
+export interface ApiKey {
+  id: string; // Unique identifier (timestamp)
+  provider: string; // Provider ID (e.g., "openai")
+  key: string; // API key value
+  label?: string; // Optional label (e.g., "Work account")
+  createdAt: string; // ISO timestamp
+  isDefault?: boolean; // Mark as default for provider
+}
+
 // Settings slice
 interface SettingsState {
   provider: string | null;
   modelId: string | null;
-  apiKey: string;
+  apiKey: string; // Deprecated: kept for backward compatibility
+  apiKeys: ApiKey[]; // NEW: Array of API keys
   systemPromptRules: string;
   setProvider: (provider: string | null) => void;
   setModelId: (modelId: string | null) => void;
-  setApiKey: (apiKey: string) => void;
+  setApiKey: (apiKey: string) => void; // Deprecated: kept for backward compatibility
   setSystemPromptRules: (rules: string) => void;
   resetSystemPromptRules: () => void;
+  // API key management
+  addApiKey: (apiKey: Omit<ApiKey, "id" | "createdAt">) => void;
+  removeApiKey: (keyId: string) => void;
+  updateApiKey: (keyId: string, updates: Partial<ApiKey>) => void;
+  setDefaultApiKey: (keyId: string) => void;
+  getApiKeyForProvider: (provider: string) => string | undefined;
 }
 
 // Wizard slice
@@ -93,20 +110,88 @@ interface HistoryState {
 // Combined store
 interface AppStore extends SettingsState, WizardState, HistoryState { }
 
+// Migration logic for API keys
+const migrateApiKeys = (state: AppStore): AppStore => {
+  // If we have old apiKey but no apiKeys, migrate it
+  if (state.apiKey && state.apiKeys.length === 0 && state.provider) {
+    const newKey: ApiKey = {
+      id: Date.now().toString(),
+      provider: state.provider,
+      key: state.apiKey,
+      label: "Migrated key",
+      createdAt: new Date().toISOString(),
+      isDefault: true,
+    };
+
+    return {
+      ...state,
+      apiKeys: [newKey],
+    };
+  }
+  return state;
+};
+
 export const useAppStore = create<AppStore>()(
   persist(
     (set, get) => ({
       // Settings
       provider: null,
       modelId: null,
-      apiKey: "",
+      apiKey: "", // Deprecated but kept
+      apiKeys: [], // NEW
       systemPromptRules: DEFAULT_SYSTEM_PROMPT_RULES,
       setProvider: (provider) => set({ provider }),
       setModelId: (modelId) => set({ modelId }),
-      setApiKey: (apiKey) => set({ apiKey }),
+      setApiKey: (apiKey) => set({ apiKey }), // Deprecated
       setSystemPromptRules: (systemPromptRules) => set({ systemPromptRules }),
       resetSystemPromptRules: () =>
         set({ systemPromptRules: DEFAULT_SYSTEM_PROMPT_RULES }),
+
+      // NEW: API key management actions
+      addApiKey: (keyData) =>
+        set((state) => ({
+          apiKeys: [
+            ...state.apiKeys,
+            {
+              ...keyData,
+              id: Date.now().toString(),
+              createdAt: new Date().toISOString(),
+              isDefault:
+                keyData.isDefault ||
+                state.apiKeys.filter((k) => k.provider === keyData.provider)
+                  .length === 0,
+            },
+          ],
+        })),
+
+      removeApiKey: (keyId) =>
+        set((state) => ({
+          apiKeys: state.apiKeys.filter((k) => k.id !== keyId),
+        })),
+
+      updateApiKey: (keyId, updates) =>
+        set((state) => ({
+          apiKeys: state.apiKeys.map((k) =>
+            k.id === keyId ? { ...k, ...updates } : k
+          ),
+        })),
+
+      setDefaultApiKey: (keyId) =>
+        set((state) => ({
+          apiKeys: state.apiKeys.map((k) => ({
+            ...k,
+            isDefault: k.id === keyId,
+          })),
+        })),
+
+      getApiKeyForProvider: (provider) => {
+        const state = get();
+        // Try to find API key for provider
+        const key = state.apiKeys.find(
+          (k) => k.provider === provider && k.isDefault
+        );
+        return key?.key || state.apiKey; // Fallback to old apiKey
+      },
 
       // Wizard
       activeStep: 0,
@@ -180,12 +265,26 @@ export const useAppStore = create<AppStore>()(
         // Only persist settings and history, not wizard state
         provider: state.provider,
         modelId: state.modelId,
-        apiKey: state.apiKey,
+        apiKey: state.apiKey, // Persist old apiKey for migration
+        apiKeys: state.apiKeys, // Persist new API keys
         systemPromptRules: state.systemPromptRules,
         conversations: state.conversations,
       }),
+      onRehydrateStorage: () => {
+        return (state, error) => {
+          if (error) {
+            console.error("Error rehydrating store:", error);
+            return;
+          }
+          if (state) {
+            const migrated = migrateApiKeys(state);
+            if (migrated !== state) {
+              // Update the store with migrated data
+              useAppStore.setState(migrated);
+            }
+          }
+        };
+      },
     }
   )
 );
-
-

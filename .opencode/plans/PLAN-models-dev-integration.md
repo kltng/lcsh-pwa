@@ -124,14 +124,13 @@ export async function getModelById(modelId: string): Promise<ModelInfo | null>
     - Client-side: use `/api/models` route to avoid CORS
     - Only fetch if `USE_MODELS_DEV=true`
 
- 3. **Model ID Resolution**
+ 4. **Model ID Resolution**
     - Use model's own `id` field if present
     - Otherwise construct: `${providerId}/${modelId}`
 
  5. **Fallback Mechanism**
     - If models.dev fails, fall back to local registry
     - Local registry functions from `lib/model-registry.ts`
-    - Log warnings when fallback occurs
     - Log warnings when fallback occurs
 
 ---
@@ -200,351 +199,56 @@ USE_MODELS_DEV=true
 
 ---
 
-### Phase 1.6: Multiple API Keys Support
+### Phase 1.6: Server-Side API Keys (Multi-Key Support)
 
-#### Step 1.6.1: Update Store Schema
-**File:** `lib/store.ts` (MODIFY)
+#### Step 1.6.1: Environment Variable Conventions
+**Files:** Server environment (deployment config)
 
-**Purpose:** Support multiple API keys per provider
+**Purpose:** Store all API keys server-side, support multiple keys per provider
 
-**New Types:**
+**Conventions:**
 
-```typescript
-export interface ApiKey {
-  id: string;                    // Unique identifier (timestamp)
-  provider: string;               // Provider ID (e.g., "openai")
-  key: string;                   // API key value
-  label?: string;                // Optional label (e.g., "Work account")
-  createdAt: string;             // ISO timestamp
-  isDefault?: boolean;           // Mark as default for provider
-}
+- Use models.dev provider env names (e.g., `OPENAI_API_KEY`)
+- Support multiple keys via `${ENV_NAME}S` (comma-separated)
 
-interface SettingsState {
-  provider: string | null;
-  modelId: string | null;
-  apiKey: string;                 // Deprecated: kept for backward compatibility
-  apiKeys: ApiKey[];             // NEW: Array of API keys
-  systemPromptRules: string;
+Example:
 
-  // Deprecated actions (kept for backward compatibility)
-  setApiKey: (apiKey: string) => void;
-
-  // New actions
-  setProvider: (provider: string | null) => void;
-  setModelId: (modelId: string | null) => void;
-  setSystemPromptRules: (rules: string) => void;
-  resetSystemPromptRules: () => void;
-
-  // API key management
-  addApiKey: (apiKey: Omit<ApiKey, "id" | "createdAt">) => void;
-  removeApiKey: (keyId: string) => void;
-  updateApiKey: (keyId: string, updates: Partial<ApiKey>) => void;
-  setDefaultApiKey: (keyId: string) => void;
-  getApiKeyForProvider: (provider: string) => string | undefined;
-}
+```bash
+OPENAI_API_KEY=key_primary
+OPENAI_API_KEYS=key_primary,key_secondary,key_third
 ```
 
-**Updated Initial State:**
-
-```typescript
-export const useAppStore = create<AppStore>()(
-  persist(
-    (set, get) => ({
-      // Settings
-      provider: null,
-      modelId: null,
-      apiKey: "",                    // Deprecated but kept
-      apiKeys: [],                   // NEW
-      systemPromptRules: DEFAULT_SYSTEM_PROMPT_RULES,
-
-      // Actions
-      setProvider: (provider) => set({ provider }),
-      setModelId: (modelId) => set({ modelId }),
-      setApiKey: (apiKey) => set({ apiKey }), // Deprecated
-
-      // NEW: API key management actions
-      addApiKey: (keyData) => set((state) => ({
-        apiKeys: [
-          ...state.apiKeys,
-          {
-            ...keyData,
-            id: Date.now().toString(),
-            createdAt: new Date().toISOString(),
-            isDefault: keyData.isDefault || state.apiKeys.length === 0,
-          },
-        ],
-      })),
-
-      removeApiKey: (keyId) => set((state) => ({
-        apiKeys: state.apiKeys.filter((k) => k.id !== keyId),
-      })),
-
-      updateApiKey: (keyId, updates) => set((state) => ({
-        apiKeys: state.apiKeys.map((k) =>
-          k.id === keyId ? { ...k, ...updates } : k
-        ),
-      })),
-
-      setDefaultApiKey: (keyId) => set((state) => ({
-        apiKeys: state.apiKeys.map((k) => ({
-          ...k,
-          isDefault: k.id === keyId,
-        })),
-      })),
-
-      getApiKeyForProvider: (provider) => {
-        const state = get();
-        // Try to find API key for provider
-        const key = state.apiKeys.find(
-          (k) => k.provider === provider && k.isDefault
-        );
-        return key?.key || state.apiKey; // Fallback to old apiKey
-      },
-
-      // ... other existing actions
-    }),
-    {
-      name: "cataloging-assistant-storage",
-      partialize: (state) => ({
-        // Persist settings and history
-        provider: state.provider,
-        modelId: state.modelId,
-        apiKey: state.apiKey,           // Persist old apiKey for migration
-        apiKeys: state.apiKeys,          // Persist new API keys
-        systemPromptRules: state.systemPromptRules,
-        conversations: state.conversations,
-      }),
-    }
-  )
-);
-```
-
----
-
-#### Step 1.6.2: Migration Logic
-**File:** `lib/store.ts` (MODIFY)
-
-**Purpose:** Migrate single apiKey to multiple apiKeys array
-
-**Implementation:**
-
-```typescript
-// Add migration logic in store initialization
-const migrateApiKeys = (state: AppStore): AppStore => {
-  // If we have old apiKey but no apiKeys, migrate it
-  if (state.apiKey && state.apiKeys.length === 0 && state.provider) {
-    const newKey: ApiKey = {
-      id: Date.now().toString(),
-      provider: state.provider,
-      key: state.apiKey,
-      label: "Migrated key",
-      createdAt: new Date().toISOString(),
-      isDefault: true,
-    };
-
-    return {
-      ...state,
-      apiKeys: [newKey],
-    };
-  }
-  return state;
-};
-
-// Apply migration when loading persisted state
-const initialState: AppStore = {
-  // ... existing initial state
-};
-
-export const useAppStore = create<AppStore>()(
-  persist(
-    (set, get) => ({
-      ...initialState,
-      // ... actions
-    }),
-    {
-      name: "cataloging-assistant-storage",
-      partialize: (state) => ({ /* ... */ }),
-      onRehydrateStorage: () => (state) => {
-        if (state) {
-          const migrated = migrateApiKeys(state);
-          if (migrated !== state) {
-            // Trigger state update with migrated data
-            set(migrated);
-          }
-        }
-      },
-    }
-  )
-);
-```
-
----
-
-#### Step 1.6.3: Update API Route to Use Multiple Keys
+#### Step 1.6.2: Server-Side Key Selection
 **File:** `app/api/generate/route.ts` (MODIFY)
 
-**Purpose:** Get correct API key based on provider
+**Behavior:**
+
+- Read provider env names from models.dev data (`ProviderInfo.env`)
+- Parse multi-key values from `${ENV_NAME}S`
+- Select keys using round-robin per provider
+- If provider has env names and no keys, return 400
+- Providers without env names (or `lmstudio`) allow empty key
+
+#### Step 1.6.3: Test Connection
+**File:** `app/settings/page.tsx` (MODIFY)
+
+**Behavior:**
+
+- Test uses server-side keys
+- No API key input in the UI
+
+---
+
+### Phase 3.5: Update Settings UI (Server-Managed Keys)
+
+#### Step 3.5.1: Remove Client-Side API Key Input
+**File:** `app/settings/page.tsx` (MODIFY)
 
 **Changes:**
 
-```typescript
-export async function POST(request: NextRequest) {
-  const {
-    modelId,
-    apiKey,  // Deprecated: single key (optional now)
-    provider,
-    providerKeyId, // NEW: specific key ID to use (optional)
-  } = body;
-
-  if (!provider) {
-    return NextResponse.json(
-      { error: "provider is required" },
-      { status: 400 }
-    );
-  }
-
-  // Get API key for provider
-  // If providerKeyId is provided, use that specific key
-  // Otherwise, use the default key for the provider
-  let finalApiKey: string;
-
-  if (typeof window === "undefined") {
-    // Server-side: use env var if available, otherwise use provided key
-    const envVarName = modelInfo.apiKeyEnv?.toUpperCase();
-    if (envVarName && process.env[envVarName]) {
-      finalApiKey = process.env[envVarName]!;
-    } else {
-      // Try to find key in apiKeys array
-      const key = apiKeys.find((k) =>
-        providerKeyId ? k.id === providerKeyId : k.provider === provider && k.isDefault
-      );
-      finalApiKey = key?.key || apiKey || "";
-    }
-  } else {
-    // Client-side: use provided apiKey (for backward compatibility)
-    finalApiKey = apiKey || "";
-  }
-
-  if (!finalApiKey && provider !== "lmstudio") {
-    return NextResponse.json(
-      { error: `No API key found for provider ${provider}. Please add one in Settings.` },
-      { status: 400 }
-    );
-  }
-
-  // ... rest of the logic
-}
-```
-
----
-
-### Phase 3.5: Update Settings UI for Multiple Keys
-
-#### Step 3.5.1: Add API Keys Management Section
-**File:** `app/settings/page.tsx` (MODIFY)
-
-**Purpose:** Allow users to add/remove/manage multiple API keys per provider
-
-**New UI Components:**
-
-```typescript
-// Add to settings page
-{provider && (
-  <Card>
-    <CardHeader>
-      <CardTitle>API Keys for {providers.find(p => p.id === provider)?.name}</CardTitle>
-      <CardDescription>
-        Manage multiple API keys for this provider
-      </CardDescription>
-    </CardHeader>
-    <CardContent className="space-y-4">
-      {/* Add new key form */}
-      <div className="flex gap-2">
-        <Input
-          placeholder="Enter API key"
-          value={newApiKey}
-          onChange={(e) => setNewApiKey(e.target.value)}
-          type="password"
-        />
-        <Input
-          placeholder="Label (optional)"
-          value={newKeyLabel}
-          onChange={(e) => setNewKeyLabel(e.target.value)}
-        />
-        <Button onClick={handleAddKey}>Add</Button>
-      </div>
-
-      {/* List existing keys */}
-      {apiKeys.filter(k => k.provider === provider).map((key) => (
-        <div key={key.id} className="flex items-center gap-2 p-2 border rounded">
-          <div className="flex-1">
-            <div className="font-medium">{key.label || `Key ${key.id.slice(-4)}`}</div>
-            <div className="text-sm text-muted-foreground">
-              {key.key.slice(0, 8)}...{key.key.slice(-4)}
-            </div>
-          </div>
-          {key.isDefault && (
-            <Badge variant="secondary">Default</Badge>
-          )}
-          {!key.isDefault && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => handleSetDefault(key.id)}
-            >
-              Set Default
-            </Button>
-          )}
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => handleRemoveKey(key.id)}
-          >
-            Remove
-          </Button>
-        </div>
-      ))}
-    </CardContent>
-  </Card>
-)}
-```
-
-**Handler Functions:**
-
-```typescript
-const [apiKeys, setApiKeys] = useState<ApiKey[]>([]);
-const [newApiKey, setNewApiKey] = useState("");
-const [newKeyLabel, setNewKeyLabel] = useState("");
-
-// Load API keys from store
-useEffect(() => {
-  setApiKeys(useAppStore.getState().apiKeys);
-}, []);
-
-function handleAddKey() {
-  if (!provider || !newApiKey.trim()) return;
-
-  addApiKey({
-    provider,
-    key: newApiKey.trim(),
-    label: newKeyLabel.trim() || undefined,
-  });
-
-  setNewApiKey("");
-  setNewKeyLabel("");
-  setApiKeys(useAppStore.getState().apiKeys);
-}
-
-function handleRemoveKey(keyId: string) {
-  removeApiKey(keyId);
-  setApiKeys(useAppStore.getState().apiKeys);
-}
-
-function handleSetDefault(keyId: string) {
-  setDefaultApiKey(keyId);
-  setApiKeys(useAppStore.getState().apiKeys);
-}
-```
+- Remove API key input field
+- Add note that API keys are managed server-side
+- Keep "Test Connection" to validate server keys
    - If models.dev fails, fall back to local registry
    - Local registry functions from `lib/model-registry.ts`
 
@@ -780,7 +484,7 @@ If issues arise:
 
 1. **Quick Revert:** Use `git revert` on the implementation commit
 2. **Feature Flag:** Add `USE_MODELS_DEV` environment variable to toggle between models.dev and local registry
-3. **Per-User Opt-In:** Allow users to choose "Dynamic (models.dev)" or "Local" mode in settings
+3. **Force Local Registry:** Set `USE_MODELS_DEV=false` in the server environment
 
 ---
 
@@ -799,29 +503,17 @@ If issues arise:
    - **Decision:** No, don't show model pricing/capabilities in UI
    - Rationale: Keeps UI simple; pricing can be viewed on models.dev
 
-4. **Multiple API Keys**
-   - **Decision:** Yes, support multiple API keys per provider
-   - Features:
-     - Add/remove keys per provider
-     - Set default key per provider
-     - Label keys for organization
-     - Migrate single `apiKey` to new `apiKeys` array
+4. **API Keys (Server-Side Only)**
+   - **Decision:** All API keys are server-side environment variables
+   - Multi-key support via `${ENV_NAME}S` (comma-separated)
+   - Keys are selected per request using round-robin
+   - No client-side storage or encryption
 
 5. **Model Sorting**
    - **Decision:** Sort models alphabetically by name
    - Rationale: Predictable ordering for users
 
-6. **API Key Storage**
-   - **Decision:** Store in Zustand with localStorage persistence
-   - Same as current `apiKey` implementation
-   - Keys are encrypted at rest in browser
-
-7. **Migration Strategy**
-   - **Decision:** Automatic migration from single `apiKey` to `apiKeys` array
-   - Backward compatible: old `apiKey` field kept in store
-   - Migration runs on store rehydration
-
-8. **Removed Model Handling**
+6. **Removed Model Handling**
    - **Decision:** Warn user if selected model is not found in current models.dev response
    - Show "This model may be deprecated" message in settings
    - Allow user to continue (model might still work)
@@ -837,11 +529,9 @@ If issues arise:
 - [x] API keys are validated before making requests
 - [x] Error messages are helpful and actionable
 - [x] Cache invalidation works correctly (24h TTL)
-- [x] No breaking changes to existing user state
+- [x] API keys are server-managed (no client storage)
 - [x] Feature flag `USE_MODELS_DEV` toggles between models.dev and local registry
-- [x] Multiple API keys per provider are supported
-- [x] Users can set default API key per provider
-- [x] Old single `apiKey` migrates to new `apiKeys` array format
+- [x] Multiple API keys per provider are supported via env vars
 
 ---
 
@@ -851,10 +541,10 @@ If issues arise:
 |-------|-------|----------------|
 | Phase 1 | Restore models.dev API integration + feature flag | 3-4 hours |
 | Phase 2 | Update API route for dynamic selection | 1-2 hours |
-| Phase 3 | Update settings UI + multi-key management | 3-4 hours |
+| Phase 3 | Update settings UI (server-managed keys) | 2-3 hours |
 | Phase 4 | Update type definitions | 1 hour |
 | Phase 5 | Testing and validation | 2-3 hours |
-| **Total** | | **10-14 hours** |
+| **Total** | | **9-13 hours** |
 
 ---
 
