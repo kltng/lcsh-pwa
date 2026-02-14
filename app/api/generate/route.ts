@@ -4,11 +4,13 @@ import { createOpenAI } from "@ai-sdk/openai";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { createAnthropic } from "@ai-sdk/anthropic";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
-import { getModelsByProvider, getModelSDKConfig } from "@/lib/models";
+import { getModelsByProvider, getModelSDKConfig, type ExtendedModelInfo } from "@/lib/models";
 import { searchLcsh, type LcshResult } from "@/lib/lcsh";
 import { calculateSimilarity } from "@/lib/similarity";
-import { getProviderHardcodedBaseURL, getProviderGroup } from "@/lib/provider-groups";
+import { getProviderHardcodedBaseURL, LOCAL_PROVIDERS } from "@/lib/provider-groups";
 import { z } from "zod";
+
+const LOCAL_PROVIDER_IDS = LOCAL_PROVIDERS.map(p => p.id);
 
 // Schema for structured LCSH suggestions
 const lcshSuggestionSchema = z.object({
@@ -95,35 +97,49 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get model info - MUST filter by provider to ensure we get the correct model
-    // Multiple providers (e.g., "google", "firmware", "vercel") may host the same model
-    // We need to use the model from the provider the user selected
-    console.log("Looking up model:", modelId, "from provider:", provider);
-    
-    // Get all models for the selected provider and find the matching model
-    const providerModels = await getModelsByProvider(provider);
-    const modelInfo = providerModels.find((m) => m.id === modelId);
-    
-    console.log("Model info found:", modelInfo ? { 
-      id: modelInfo.id, 
-      name: modelInfo.name, 
-      provider: modelInfo.provider,
-      providerName: modelInfo.providerName 
-    } : null);
+    const isLocalProvider = LOCAL_PROVIDER_IDS.includes(provider);
+    let modelInfo: ExtendedModelInfo | null = null;
 
-    if (!modelInfo) {
-      // Provide helpful error with available models from the selected provider
-      const availableModels = providerModels.slice(0, 5).map(m => m.id);
+    if (isLocalProvider) {
+      const hardcodedBaseURL = getProviderHardcodedBaseURL(provider);
+      modelInfo = {
+        id: modelId,
+        name: modelId,
+        provider: provider,
+        providerName: provider === 'lmstudio' ? 'LM Studio' : 'Ollama',
+        baseURL: hardcodedBaseURL || baseURL,
+      };
+      console.log("Using local provider with dynamic model:", { 
+        provider, 
+        modelId, 
+        baseURL: modelInfo.baseURL 
+      });
+    } else {
+      console.log("Looking up model:", modelId, "from provider:", provider);
       
-      return NextResponse.json(
-        {
-          error: `Model ${modelId} not found for provider ${provider}`,
-          suggestion: availableModels.length > 0 
-            ? `Available models from ${provider}: ${availableModels.join(", ")}` 
-            : `No models found for provider ${provider}`
-        },
-        { status: 404 }
-      );
+      const providerModels = await getModelsByProvider(provider);
+      modelInfo = providerModels.find((m) => m.id === modelId) || null;
+      
+      console.log("Model info found:", modelInfo ? { 
+        id: modelInfo.id, 
+        name: modelInfo.name, 
+        provider: modelInfo.provider,
+        providerName: modelInfo.providerName 
+      } : null);
+
+      if (!modelInfo) {
+        const availableModels = providerModels.slice(0, 5).map(m => m.id);
+        
+        return NextResponse.json(
+          {
+            error: `Model ${modelId} not found for provider ${provider}`,
+            suggestion: availableModels.length > 0 
+              ? `Available models from ${provider}: ${availableModels.join(", ")}` 
+              : `No models found for provider ${provider}`
+          },
+          { status: 404 }
+        );
+      }
     }
 
     // Get API key for provider
@@ -167,26 +183,37 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const sdkConfig = getModelSDKConfig(modelInfo);
-    const modelName = sdkConfig.modelId;
+    let sdkProvider: "openai" | "google" | "anthropic" | "openai-compatible";
+    let modelName: string;
+    let effectiveBaseURL: string;
 
-    const hardcodedBaseURL = getProviderHardcodedBaseURL(provider);
-    const effectiveBaseURL = baseURL || hardcodedBaseURL || sdkConfig.baseURL || "";
+    if (isLocalProvider) {
+      sdkProvider = "openai-compatible";
+      modelName = modelId;
+      const hardcodedBaseURL = getProviderHardcodedBaseURL(provider);
+      effectiveBaseURL = baseURL || hardcodedBaseURL || "";
+    } else {
+      const sdkConfig = getModelSDKConfig(modelInfo!);
+      sdkProvider = sdkConfig.provider;
+      modelName = sdkConfig.modelId;
+      const hardcodedBaseURL = getProviderHardcodedBaseURL(provider);
+      effectiveBaseURL = baseURL || hardcodedBaseURL || sdkConfig.baseURL || "";
+    }
 
     console.log("Using SDK config:", { 
-      sdkProvider: sdkConfig.provider, 
+      sdkProvider, 
       modelName, 
       baseURL: effectiveBaseURL 
     });
 
     let model: any;
-    if (sdkConfig.provider === "openai") {
+    if (sdkProvider === "openai") {
       const openaiClient = createOpenAI({ apiKey: finalApiKey });
       model = openaiClient(modelName);
-    } else if (sdkConfig.provider === "google") {
+    } else if (sdkProvider === "google") {
       const googleClient = createGoogleGenerativeAI({ apiKey: finalApiKey });
       model = googleClient(modelName);
-    } else if (sdkConfig.provider === "anthropic") {
+    } else if (sdkProvider === "anthropic") {
       const anthropicClient = createAnthropic({ apiKey: finalApiKey });
       model = anthropicClient(modelName);
     } else {
@@ -267,7 +294,7 @@ ${bibliographicInfo.notes ? `Notes: ${bibliographicInfo.notes}` : ""}
 Return your response as a JSON object with a "terms" array containing objects with "suggestedHeading" and "reason" properties.`;
 
       // For OpenAI-compatible providers that require "json" in prompt for JSON mode
-      const needsJsonInPrompt = sdkConfig.provider === "openai-compatible";
+      const needsJsonInPrompt = sdkProvider === "openai-compatible";
       const enhancedUserPrompt = needsJsonInPrompt 
         ? `${userPrompt}\n\nReturn your response as valid JSON.`
         : userPrompt;

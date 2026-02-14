@@ -4,8 +4,11 @@ import { createOpenAI } from "@ai-sdk/openai";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { createAnthropic } from "@ai-sdk/anthropic";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
-import { getModelsByProvider, getModelSDKConfig } from "@/lib/models";
-import { getProviderHardcodedBaseURL, getProviderGroup } from "@/lib/provider-groups";
+import { getModelsByProvider, getModelSDKConfig, type ExtendedModelInfo } from "@/lib/models";
+import { getProviderHardcodedBaseURL, LOCAL_PROVIDERS } from "@/lib/provider-groups";
+
+// Local providers that serve dynamic models - don't validate against registry
+const LOCAL_PROVIDER_IDS = LOCAL_PROVIDERS.map(p => p.id);
 
 export async function POST(request: NextRequest) {
   try {
@@ -26,15 +29,33 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get model info
-    const providerModels = await getModelsByProvider(provider);
-    const modelInfo = providerModels.find((m) => m.id === modelId);
+    // Check if this is a local provider (lmstudio, ollama)
+    const isLocalProvider = LOCAL_PROVIDER_IDS.includes(provider);
 
-    if (!modelInfo) {
-      return NextResponse.json(
-        { error: `Model ${modelId} not found for provider ${provider}` },
-        { status: 404 }
-      );
+    let modelInfo: ExtendedModelInfo | null = null;
+
+    if (isLocalProvider) {
+      // For local providers, create a synthetic modelInfo using the provided modelId
+      // Local providers serve dynamic models that aren't in our registry
+      const hardcodedBaseURL = getProviderHardcodedBaseURL(provider);
+      modelInfo = {
+        id: modelId,
+        name: modelId,
+        provider: provider,
+        providerName: provider === 'lmstudio' ? 'LM Studio' : 'Ollama',
+        baseURL: hardcodedBaseURL || baseURL,
+      };
+    } else {
+      // For cloud providers, validate model exists in registry
+      const providerModels = await getModelsByProvider(provider);
+      modelInfo = providerModels.find((m) => m.id === modelId) || null;
+
+      if (!modelInfo) {
+        return NextResponse.json(
+          { error: `Model ${modelId} not found for provider ${provider}` },
+          { status: 404 }
+        );
+      }
     }
 
     // Get API key for provider
@@ -77,21 +98,34 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const sdkConfig = getModelSDKConfig(modelInfo);
-    const modelName = sdkConfig.modelId;
+    // Determine SDK configuration
+    let sdkProvider: "openai" | "google" | "anthropic" | "openai-compatible";
+    let modelName: string;
+    let effectiveBaseURL: string;
 
-    const providerGroup = getProviderGroup(provider);
-    const hardcodedBaseURL = getProviderHardcodedBaseURL(provider);
-    const effectiveBaseURL = baseURL || hardcodedBaseURL || sdkConfig.baseURL || "";
+    if (isLocalProvider) {
+      // Local providers always use OpenAI-compatible SDK with their base URL
+      sdkProvider = "openai-compatible";
+      modelName = modelId;
+      const hardcodedBaseURL = getProviderHardcodedBaseURL(provider);
+      effectiveBaseURL = baseURL || hardcodedBaseURL || "";
+    } else {
+      // Cloud providers use SDK config from registry
+      const sdkConfig = getModelSDKConfig(modelInfo!);
+      sdkProvider = sdkConfig.provider;
+      modelName = sdkConfig.modelId;
+      const hardcodedBaseURL = getProviderHardcodedBaseURL(provider);
+      effectiveBaseURL = baseURL || hardcodedBaseURL || sdkConfig.baseURL || "";
+    }
 
     let model: any;
-    if (sdkConfig.provider === "openai") {
+    if (sdkProvider === "openai") {
       const openaiClient = createOpenAI({ apiKey: finalApiKey });
       model = openaiClient(modelName);
-    } else if (sdkConfig.provider === "google") {
+    } else if (sdkProvider === "google") {
       const googleClient = createGoogleGenerativeAI({ apiKey: finalApiKey });
       model = googleClient(modelName);
-    } else if (sdkConfig.provider === "anthropic") {
+    } else if (sdkProvider === "anthropic") {
       const anthropicClient = createAnthropic({ apiKey: finalApiKey });
       model = anthropicClient(modelName);
     } else {

@@ -27,6 +27,7 @@ import {
   type ProviderGroup,
   type ProviderWithGroup,
 } from "@/lib/provider-groups";
+import { isDeployed } from "@/lib/env";
 
 export default function SettingsPage() {
   const {
@@ -61,6 +62,11 @@ export default function SettingsPage() {
   const [customBaseURL, setCustomBaseURL] = useState("");
   const [customLabel, setCustomLabel] = useState("");
   const [fetchingModels, setFetchingModels] = useState(false);
+  const [isDeployedEnv, setIsDeployedEnv] = useState(false);
+
+  useEffect(() => {
+    setIsDeployedEnv(isDeployed());
+  }, []);
 
   useEffect(() => {
     if (provider) {
@@ -311,6 +317,7 @@ export default function SettingsPage() {
     } catch (err) {
       console.error("Test connection failed:", err);
       let errorMessage = "Connection failed. Please check your configuration.";
+      const isLocal = getProviderGroup(provider || "") === 'local';
       
       if (err instanceof Error) {
         errorMessage = err.message;
@@ -322,8 +329,14 @@ export default function SettingsPage() {
           errorMessage = "API key does not have permission to access this model.";
         } else if (err.message.includes("429") || err.message.includes("rate limit")) {
           errorMessage = "Rate limit exceeded. Please try again later.";
-        } else if (err.message.includes("network") || err.message.includes("fetch") || err.message.includes("connect")) {
-          errorMessage = "Network error. Please check the BaseURL and your internet connection.";
+        } else if (err.message.includes("network") || err.message.includes("fetch") || err.message.includes("connect") || err.message.includes("ECONNREFUSED")) {
+          if (isLocal) {
+            const providerName = provider === 'lmstudio' ? 'LM Studio' : 'Ollama';
+            const defaultPort = provider === 'lmstudio' ? '1234' : '11434';
+            errorMessage = `Cannot connect to ${providerName} at ${localBaseURL}. Make sure ${providerName} is running and the model is loaded. Default port is ${defaultPort}.`;
+          } else {
+            errorMessage = "Network error. Please check the BaseURL and your internet connection.";
+          }
         }
       }
 
@@ -747,6 +760,14 @@ export default function SettingsPage() {
               </TabsContent>
               
               <TabsContent value="local" className="mt-4">
+                {isDeployedEnv && (
+                  <Alert variant="destructive" className="mb-4">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription>
+                      <strong>Local models require a locally-running app.</strong> This app is running on a remote server and cannot connect to LM Studio or Ollama on your machine. To use local models, run this app locally with <code className="px-1 py-0.5 bg-muted rounded text-xs">npm run dev</code> or self-host it.
+                    </AlertDescription>
+                  </Alert>
+                )}
                 {renderConfigPanel('local')}
               </TabsContent>
               
