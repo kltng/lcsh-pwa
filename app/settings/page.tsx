@@ -60,7 +60,6 @@ export default function SettingsPage() {
   const [localBaseURL, setLocalBaseURL] = useState("");
   const [customBaseURL, setCustomBaseURL] = useState("");
   const [customLabel, setCustomLabel] = useState("");
-  const [customModelInput, setCustomModelInput] = useState("");
   const [fetchingModels, setFetchingModels] = useState(false);
 
   useEffect(() => {
@@ -93,18 +92,45 @@ export default function SettingsPage() {
     }
   }, [provider, apiKeys]);
 
+  useEffect(() => {
+    if (activeTab === 'openai-compatible' && !provider) {
+      setProviderApiKeys([]);
+    }
+  }, [activeTab, provider]);
+
   async function loadCloudModels(providerId: string) {
     try {
       setLoadingModels(true);
       setError(null);
+      
+      const apiKey = getApiKeyForProvider(providerId);
+      
+      if (apiKey) {
+        const response = await fetch(
+          `/api/provider-models?provider=${providerId}&apiKey=${encodeURIComponent(apiKey)}`
+        );
+        
+        if (response.ok) {
+          const data = await response.json();
+          setModels(data.models || []);
+          if (data.models?.length > 0) {
+            return;
+          }
+        }
+      }
+      
       const modelList = await getModelsByProvider(providerId);
       setModels(modelList);
+      
       if (modelList.length === 0) {
-        setError("No models found for this provider.");
+        setError("No models found. Please add an API key to fetch the latest models.");
+      } else if (!apiKey) {
+        setError("Using cached model list. Add an API key to fetch the latest models.");
       }
     } catch (err) {
       console.error("Error loading models:", err);
       setError(err instanceof Error ? err.message : "Failed to load models");
+      setModels([]);
     } finally {
       setLoadingModels(false);
     }
@@ -131,18 +157,18 @@ export default function SettingsPage() {
       const fetchedModels: ExtendedModelInfo[] = (data.models || []).map((m: { id: string; name: string }) => ({
         id: m.id,
         name: m.name,
-        provider: provider || "",
-        providerName: provider || "",
+        provider: provider || "custom",
+        providerName: customLabel || "Custom",
       }));
       
       setModels(fetchedModels);
       
       if (fetchedModels.length === 0) {
-        setError("No models found at this endpoint.");
+        setError("No models found at this endpoint. You can enter the model ID manually.");
       }
     } catch (err) {
       console.error("Error fetching models:", err);
-      setError(err instanceof Error ? err.message : "Failed to fetch models");
+      setError(err instanceof Error ? err.message : "Failed to fetch models. You can enter the model ID manually.");
       setModels([]);
     } finally {
       setFetchingModels(false);
@@ -187,17 +213,24 @@ export default function SettingsPage() {
   }
 
   function handleAddKey() {
-    if (!provider || !newApiKey.trim()) return;
+    let effectiveProvider = provider;
+    
+    if (activeTab === 'openai-compatible' && !provider) {
+      effectiveProvider = customLabel?.toLowerCase().replace(/\s+/g, '-') || `custom-${Date.now()}`;
+      setProvider(effectiveProvider);
+    }
+    
+    if (!effectiveProvider || !newApiKey.trim()) return;
 
     addApiKey({
-      provider,
+      provider: effectiveProvider,
       key: newApiKey.trim(),
       label: newKeyLabel.trim() || undefined,
     });
 
     setNewApiKey("");
     setNewKeyLabel("");
-    const keys = useAppStore.getState().apiKeys.filter((k) => k.provider === provider);
+    const keys = useAppStore.getState().apiKeys.filter((k) => k.provider === effectiveProvider);
     setProviderApiKeys(keys);
   }
 
@@ -214,16 +247,26 @@ export default function SettingsPage() {
   }
 
   async function testConnection() {
-    if (!provider || !modelId) {
+    const group = getProviderGroup(provider || "");
+    const testApiKey = getApiKeyForProvider(provider || "");
+    const effectiveModelId = modelId;
+    const effectiveBaseURL = group === 'local' ? localBaseURL : group === 'openai-compatible' ? customBaseURL : undefined;
+    
+    if (!effectiveModelId) {
       setTestResult({
         success: false,
-        message: "Please select a provider and model",
+        message: "Please enter a model ID",
       });
       return;
     }
-
-    const testApiKey = getApiKeyForProvider(provider);
-    const group = getProviderGroup(provider);
+    
+    if (group === 'openai-compatible' && !customBaseURL) {
+      setTestResult({
+        success: false,
+        message: "Please enter a Base URL",
+      });
+      return;
+    }
     
     if (!testApiKey && group === 'cloud') {
       setTestResult({
@@ -237,7 +280,9 @@ export default function SettingsPage() {
       setTesting(true);
       setTestResult(null);
 
-      const baseURL = group === 'local' ? localBaseURL : group === 'openai-compatible' ? customBaseURL : undefined;
+      const effectiveProvider = group === 'openai-compatible' 
+        ? (customLabel?.toLowerCase().replace(/\s+/g, '-') || 'openai-compatible')
+        : provider;
 
       const response = await fetch("/api/test-connection", {
         method: "POST",
@@ -245,11 +290,11 @@ export default function SettingsPage() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          modelId,
-          provider,
+          modelId: effectiveModelId,
+          provider: effectiveProvider,
           apiKey: testApiKey,
           apiKeys: apiKeys.filter((k) => k.provider === provider),
-          baseURL,
+          baseURL: effectiveBaseURL,
         }),
       });
 
@@ -289,25 +334,6 @@ export default function SettingsPage() {
     } finally {
       setTesting(false);
     }
-  }
-
-  function addCustomModel() {
-    if (!customModelInput.trim() || !provider) return;
-    
-    const newModel: ExtendedModelInfo = {
-      id: customModelInput.trim(),
-      name: customModelInput.trim(),
-      provider,
-      providerName: provider,
-    };
-    
-    setModels(prev => {
-      if (prev.some(m => m.id === newModel.id)) return prev;
-      return [...prev, newModel];
-    });
-    
-    setModelId(newModel.id);
-    setCustomModelInput("");
   }
 
   function getProviderOptionsForTab(tab: ProviderGroup): ProviderWithGroup[] {
@@ -382,49 +408,45 @@ export default function SettingsPage() {
   }
 
   function renderModelSelect(group: ProviderGroup) {
-    const showManualInput = group === 'openai-compatible';
-    
     return (
       <div className="space-y-2">
         <Label htmlFor="model">Model</Label>
-        <Select
-          value={modelId || ""}
-          onValueChange={setModelId}
-          disabled={loadingModels}
-        >
-          <SelectTrigger id="model">
-            <SelectValue placeholder={loadingModels ? "Loading models..." : "Select a model"} />
-          </SelectTrigger>
-          <SelectContent>
-            {models.length === 0 && !loadingModels && (
-              <SelectItem value="none" disabled>No models available</SelectItem>
-            )}
-            {models.map((m) => (
-              <SelectItem key={m.id} value={m.id}>
-                {m.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        
-        {showManualInput && (
-          <div className="flex gap-2 mt-2">
-            <Input
-              placeholder="Or enter model ID manually"
-              value={customModelInput}
-              onChange={(e) => setCustomModelInput(e.target.value)}
-              className="flex-1"
-              onKeyDown={(e) => e.key === 'Enter' && addCustomModel()}
-            />
+        <div className="flex gap-2">
+          <Select
+            value={modelId || ""}
+            onValueChange={setModelId}
+            disabled={loadingModels}
+          >
+            <SelectTrigger id="model" className="flex-1">
+              <SelectValue placeholder={loadingModels ? "Loading models..." : "Select a model"} />
+            </SelectTrigger>
+            <SelectContent>
+              {models.length === 0 && !loadingModels && (
+                <SelectItem value="none" disabled>No models available</SelectItem>
+              )}
+              {models.map((m) => (
+                <SelectItem key={m.id} value={m.id}>
+                  {m.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {group === 'cloud' && provider && (
             <Button
               variant="outline"
-              onClick={addCustomModel}
-              disabled={!customModelInput.trim()}
+              size="icon"
+              onClick={() => loadCloudModels(provider)}
+              disabled={loadingModels}
+              title="Refresh models"
             >
-              Add
+              {loadingModels ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <RefreshCw className="h-4 w-4" />
+              )}
             </Button>
-          </div>
-        )}
+          )}
+        </div>
         
         {loadingModels && (
           <p className="text-sm text-muted-foreground flex items-center gap-2">
@@ -437,7 +459,7 @@ export default function SettingsPage() {
   }
 
   function renderApiKeyCard() {
-    const group = getProviderGroup(provider || "");
+    const group = activeTab;
     const isOptional = group !== 'cloud';
     
     return (
@@ -522,33 +544,16 @@ export default function SettingsPage() {
   function renderConfigPanel(group: ProviderGroup) {
     const providers = getProviderOptionsForTab(group);
     
+    if (group === 'openai-compatible') {
+      return renderOpenAICompatiblePanel();
+    }
+    
     return (
       <div className="space-y-4">
         {renderProviderSelect(providers)}
         
         {provider && getProviderGroup(provider) === group && (
           <>
-            {group === 'openai-compatible' && (
-              <div className="space-y-2">
-                <Label htmlFor="customLabel">Provider Label (optional)</Label>
-                <Input
-                  id="customLabel"
-                  value={customLabel}
-                  onChange={(e) => {
-                    setCustomLabel(e.target.value);
-                    if (provider) {
-                      setProviderConfig({ 
-                        provider, 
-                        baseURL: customBaseURL, 
-                        label: e.target.value 
-                      });
-                    }
-                  }}
-                  placeholder="My Custom Endpoint"
-                />
-              </div>
-            )}
-            
             {renderBaseURLField(group)}
             {renderModelSelect(group)}
             {renderApiKeyCard()}
@@ -578,6 +583,128 @@ export default function SettingsPage() {
               </Alert>
             )}
           </>
+        )}
+      </div>
+    );
+  }
+
+  function renderOpenAICompatiblePanel() {
+    return (
+      <div className="space-y-4">
+        <div className="space-y-2">
+          <Label htmlFor="customLabel">Provider Label (optional)</Label>
+          <Input
+            id="customLabel"
+            value={customLabel}
+            onChange={(e) => {
+              setCustomLabel(e.target.value);
+              if (provider) {
+                setProviderConfig({ 
+                  provider, 
+                  baseURL: customBaseURL, 
+                  label: e.target.value 
+                });
+              }
+            }}
+            placeholder="My Custom Endpoint"
+          />
+        </div>
+        
+        <div className="space-y-2">
+          <Label htmlFor="customBaseURL">Base URL *</Label>
+          <div className="flex gap-2">
+            <Input
+              id="customBaseURL"
+              value={customBaseURL}
+              onChange={(e) => {
+                setCustomBaseURL(e.target.value);
+                if (provider) {
+                  setProviderConfig({ 
+                    provider, 
+                    baseURL: e.target.value, 
+                    label: customLabel 
+                  });
+                }
+              }}
+              placeholder="https://api.example.com/v1"
+              className="flex-1"
+            />
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => {
+                const providerId = provider || customLabel?.toLowerCase().replace(/\s+/g, '-') || `custom-${Date.now()}`;
+                if (!provider) {
+                  setProvider(providerId);
+                  setProviderConfig({ 
+                    provider: providerId, 
+                    baseURL: customBaseURL, 
+                    label: customLabel 
+                  });
+                }
+                fetchModelsFromEndpoint(customBaseURL);
+              }}
+              disabled={fetchingModels || !customBaseURL}
+              title="Fetch models from endpoint"
+            >
+              {fetchingModels ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <RefreshCw className="h-4 w-4" />
+              )}
+            </Button>
+          </div>
+        </div>
+        
+        <div className="space-y-2">
+          <Label htmlFor="model">Model ID *</Label>
+          <div className="flex gap-2">
+            <Input
+              id="model"
+              value={modelId || ""}
+              onChange={(e) => setModelId(e.target.value)}
+              placeholder="Enter model ID (e.g., gpt-4, llama-3)"
+              className="flex-1"
+              list="model-suggestions"
+            />
+            <datalist id="model-suggestions">
+              {models.map((m) => (
+                <option key={m.id} value={m.id} />
+              ))}
+            </datalist>
+          </div>
+          {models.length > 0 && (
+            <p className="text-xs text-muted-foreground">
+              {models.length} model(s) found. Click in the input to see suggestions.
+            </p>
+          )}
+        </div>
+        
+        {renderApiKeyCard()}
+        
+        <Button 
+          onClick={testConnection} 
+          disabled={testing || !customBaseURL || !modelId}
+        >
+          {testing ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Testing...
+            </>
+          ) : (
+            "Test Connection"
+          )}
+        </Button>
+
+        {testResult && (
+          <Alert variant={testResult.success ? "default" : "destructive"}>
+            {testResult.success ? (
+              <CheckCircle2 className="h-4 w-4" />
+            ) : (
+              <AlertCircle className="h-4 w-4" />
+            )}
+            <AlertDescription>{testResult.message}</AlertDescription>
+          </Alert>
         )}
       </div>
     );
