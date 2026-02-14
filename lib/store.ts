@@ -57,12 +57,21 @@ export interface ApiKey {
   isDefault?: boolean; // Mark as default for provider
 }
 
+// Provider Configuration (for BaseURL and custom settings)
+export interface ProviderConfig {
+  provider: string; // Provider ID
+  baseURL?: string; // Custom BaseURL (for local/openai-compatible)
+  label?: string; // Custom label (for openai-compatible)
+  customModels?: string[]; // Manually added model IDs
+}
+
 // Settings slice
 interface SettingsState {
   provider: string | null;
   modelId: string | null;
   apiKey: string; // Deprecated: kept for backward compatibility
-  apiKeys: ApiKey[]; // NEW: Array of API keys
+  apiKeys: ApiKey[]; // Array of API keys
+  providerConfigs: ProviderConfig[]; // Provider-specific configs (BaseURL, etc.)
   systemPromptRules: string;
   setProvider: (provider: string | null) => void;
   setModelId: (modelId: string | null) => void;
@@ -75,6 +84,10 @@ interface SettingsState {
   updateApiKey: (keyId: string, updates: Partial<ApiKey>) => void;
   setDefaultApiKey: (keyId: string) => void;
   getApiKeyForProvider: (provider: string) => string | undefined;
+  // Provider config management
+  setProviderConfig: (config: ProviderConfig) => void;
+  getProviderConfig: (provider: string) => ProviderConfig | undefined;
+  getBaseURLForProvider: (provider: string) => string | undefined;
 }
 
 // Wizard slice
@@ -138,7 +151,8 @@ export const useAppStore = create<AppStore>()(
       provider: null,
       modelId: null,
       apiKey: "", // Deprecated but kept
-      apiKeys: [], // NEW
+      apiKeys: [],
+      providerConfigs: [],
       systemPromptRules: DEFAULT_SYSTEM_PROMPT_RULES,
       setProvider: (provider) => set({ provider }),
       setModelId: (modelId) => set({ modelId }),
@@ -186,11 +200,32 @@ export const useAppStore = create<AppStore>()(
 
       getApiKeyForProvider: (provider) => {
         const state = get();
-        // Try to find API key for provider
         const key = state.apiKeys.find(
           (k) => k.provider === provider && k.isDefault
         );
-        return key?.key || state.apiKey; // Fallback to old apiKey
+        return key?.key || state.apiKey;
+      },
+
+      setProviderConfig: (config) =>
+        set((state) => {
+          const existing = state.providerConfigs.findIndex(
+            (c) => c.provider === config.provider
+          );
+          if (existing >= 0) {
+            const updated = [...state.providerConfigs];
+            updated[existing] = config;
+            return { providerConfigs: updated };
+          }
+          return { providerConfigs: [...state.providerConfigs, config] };
+        }),
+
+      getProviderConfig: (provider) => {
+        return get().providerConfigs.find((c) => c.provider === provider);
+      },
+
+      getBaseURLForProvider: (provider) => {
+        const config = get().providerConfigs.find((c) => c.provider === provider);
+        return config?.baseURL;
       },
 
       // Wizard
@@ -262,11 +297,11 @@ export const useAppStore = create<AppStore>()(
     {
       name: "cataloging-assistant-storage",
       partialize: (state) => ({
-        // Only persist settings and history, not wizard state
         provider: state.provider,
         modelId: state.modelId,
-        apiKey: state.apiKey, // Persist old apiKey for migration
-        apiKeys: state.apiKeys, // Persist new API keys
+        apiKey: state.apiKey,
+        apiKeys: state.apiKeys,
+        providerConfigs: state.providerConfigs,
         systemPromptRules: state.systemPromptRules,
         conversations: state.conversations,
       }),

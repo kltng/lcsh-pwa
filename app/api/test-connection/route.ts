@@ -5,11 +5,8 @@ import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { createAnthropic } from "@ai-sdk/anthropic";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { getModelsByProvider, getModelSDKConfig } from "@/lib/models";
+import { getProviderHardcodedBaseURL, getProviderGroup } from "@/lib/provider-groups";
 
-/**
- * Simple connection test endpoint
- * Just verifies the API key and model work, without running full LCSH generation
- */
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
@@ -19,6 +16,7 @@ export async function POST(request: NextRequest) {
       apiKeys,
       providerKeyId,
       provider,
+      baseURL,
     } = body;
 
     if (!modelId || !provider) {
@@ -69,7 +67,7 @@ export async function POST(request: NextRequest) {
       finalApiKey = apiKey;
     }
 
-    const requiresApiKey = provider !== "lmstudio";
+    const requiresApiKey = provider !== "lmstudio" && provider !== "ollama";
     if (!finalApiKey && requiresApiKey) {
       return NextResponse.json(
         {
@@ -79,11 +77,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get SDK config
     const sdkConfig = getModelSDKConfig(modelInfo);
     const modelName = sdkConfig.modelId;
 
-    // Create model client
+    const providerGroup = getProviderGroup(provider);
+    const hardcodedBaseURL = getProviderHardcodedBaseURL(provider);
+    const effectiveBaseURL = baseURL || hardcodedBaseURL || sdkConfig.baseURL || "";
+
     let model: any;
     if (sdkConfig.provider === "openai") {
       const openaiClient = createOpenAI({ apiKey: finalApiKey });
@@ -96,8 +96,8 @@ export async function POST(request: NextRequest) {
       model = anthropicClient(modelName);
     } else {
       const openaiCompatible = createOpenAICompatible({
-        name: modelInfo.provider,
-        baseURL: sdkConfig.baseURL || "",
+        name: provider,
+        baseURL: effectiveBaseURL,
         apiKey: finalApiKey || "dummy",
       });
       model = openaiCompatible(modelName);

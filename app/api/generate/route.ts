@@ -7,6 +7,7 @@ import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { getModelsByProvider, getModelSDKConfig } from "@/lib/models";
 import { searchLcsh, type LcshResult } from "@/lib/lcsh";
 import { calculateSimilarity } from "@/lib/similarity";
+import { getProviderHardcodedBaseURL, getProviderGroup } from "@/lib/provider-groups";
 import { z } from "zod";
 
 // Schema for structured LCSH suggestions
@@ -69,14 +70,15 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const {
       modelId,
-      apiKey, // Deprecated: single key (optional now)
-      apiKeys, // NEW: array of API keys
-      providerKeyId, // NEW: specific key ID to use (optional)
+      apiKey,
+      apiKeys,
+      providerKeyId,
       bibliographicInfo,
       systemPromptRules,
-      promptType = "suggestions", // "suggestions" or "marc"
-      recommendations, // For MARC generation
-      provider, // Selected provider from settings - CRITICAL for correct model lookup
+      promptType = "suggestions",
+      recommendations,
+      provider,
+      baseURL,
     } = body;
 
     if (!modelId) {
@@ -155,7 +157,7 @@ export async function POST(request: NextRequest) {
       finalApiKey = apiKey;
     }
 
-    const requiresApiKey = provider !== "lmstudio";
+    const requiresApiKey = provider !== "lmstudio" && provider !== "ollama";
     if (!finalApiKey && requiresApiKey) {
       return NextResponse.json(
         {
@@ -165,14 +167,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get SDK config - this determines which AI SDK to use
     const sdkConfig = getModelSDKConfig(modelInfo);
     const modelName = sdkConfig.modelId;
+
+    const hardcodedBaseURL = getProviderHardcodedBaseURL(provider);
+    const effectiveBaseURL = baseURL || hardcodedBaseURL || sdkConfig.baseURL || "";
 
     console.log("Using SDK config:", { 
       sdkProvider: sdkConfig.provider, 
       modelName, 
-      baseURL: sdkConfig.baseURL 
+      baseURL: effectiveBaseURL 
     });
 
     let model: any;
@@ -187,8 +191,8 @@ export async function POST(request: NextRequest) {
       model = anthropicClient(modelName);
     } else {
       const openaiCompatible = createOpenAICompatible({
-        name: modelInfo.provider,
-        baseURL: sdkConfig.baseURL || "",
+        name: provider,
+        baseURL: effectiveBaseURL,
         apiKey: finalApiKey || "dummy",
       });
       model = openaiCompatible(modelName);
