@@ -22,6 +22,8 @@ export function FinalRecommendations() {
     addConversation,
     resetWizard,
     apiKey,
+    apiKeys,
+    getApiKeyForProvider,
     modelId,
     provider, // Get provider from store to pass to API
     error,
@@ -60,7 +62,10 @@ export function FinalRecommendations() {
   async function generateMarcRecordsForHighScoring(
     recommendations: typeof sortedRecommendations
   ) {
-    if (!modelId || !apiKey || !provider) return;
+    if (!modelId || !provider) return;
+
+    const effectiveApiKey = getApiKeyForProvider(provider);
+    if (!effectiveApiKey) return;
 
     const highScoring = recommendations.filter(
       (rec) => rec.similarity && rec.similarity > 30 && rec.bestMatch
@@ -72,9 +77,10 @@ export function FinalRecommendations() {
       setProcessingMarc(true);
       const result = await generateMarcRecords({
         modelId,
-        apiKey,
+        apiKey: effectiveApiKey,
+        apiKeys,
         recommendations: highScoring,
-        provider, // Critical: pass provider to ensure correct model is used
+        provider,
       });
 
       const terms = highScoring.map((r) => r.term);
