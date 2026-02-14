@@ -116,11 +116,12 @@ export function FinalRecommendations() {
     if (!finalRecommendations) return;
 
     const csv = [
-      ["Term", "Similarity", "Best Match", "MARC"],
+      ["Term", "Similarity", "Best Match", "AI Reasoning", "MARC"],
       ...finalRecommendations.map((rec) => [
         rec.term,
         `${rec.similarity}%`,
         rec.bestMatch?.heading || "",
+        rec.justification || "",
         rec.marc || marcRecords?.[rec.term] || "",
       ]),
     ]
@@ -222,8 +223,8 @@ export function FinalRecommendations() {
                 )}
 
                 {rec.justification && (
-                  <div>
-                    <strong>Justification:</strong>
+                  <div className="bg-muted/50 rounded-md p-3">
+                    <strong>AI Reasoning:</strong>
                     <p className="text-sm text-muted-foreground mt-1">
                       {rec.justification}
                     </p>

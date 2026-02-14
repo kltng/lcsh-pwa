@@ -13,12 +13,14 @@ import { z } from "zod";
 const lcshSuggestionSchema = z.object({
   terms: z.array(z.object({
     suggestedHeading: z.string().describe("The LCSH heading suggested based on the bibliographic information"),
+    reason: z.string().describe("A brief explanation of why this LCSH term is relevant to the work being cataloged"),
   })).describe("Array of suggested LCSH terms (3-6 terms recommended)"),
 });
 
 // Response type for validated terms
 interface ValidatedTerm {
   suggestedHeading: string;
+  reason: string;
   validatedHeading: string;
   locUri: string;
   matchType: "exact" | "closest";
@@ -242,11 +244,11 @@ Focus on:
 
 Return ONLY valid LCSH-style headings. Do not include subdivisions unless you are confident they exist.
 
-IMPORTANT: You must return a JSON object with a "terms" array. Each term must be an object with a "suggestedHeading" property. Example format:
+IMPORTANT: You must return a JSON object with a "terms" array. Each term must be an object with a "suggestedHeading" and "reason" property. The reason should explain why this heading is appropriate for the work. Example format:
 {
   "terms": [
-    {"suggestedHeading": "Motion pictures--Japan"},
-    {"suggestedHeading": "Motion pictures--Japan--History"}
+    {"suggestedHeading": "Motion pictures--Japan", "reason": "The work focuses on Japanese cinema history and cultural context"},
+    {"suggestedHeading": "Motion pictures--Japan--History", "reason": "The work provides a historical overview of Japanese film industry development"}
   ]
 }`;
 
@@ -258,7 +260,7 @@ ${bibliographicInfo.abstract ? `Abstract: ${bibliographicInfo.abstract}` : ""}
 ${bibliographicInfo.tableOfContents ? `Table of Contents: ${bibliographicInfo.tableOfContents}` : ""}
 ${bibliographicInfo.notes ? `Notes: ${bibliographicInfo.notes}` : ""}
 
-Return your response as a JSON object with a "terms" array containing objects with "suggestedHeading" properties.`;
+Return your response as a JSON object with a "terms" array containing objects with "suggestedHeading" and "reason" properties.`;
 
       // For OpenAI-compatible providers that require "json" in prompt for JSON mode
       const needsJsonInPrompt = sdkConfig.provider === "openai-compatible";
@@ -278,8 +280,8 @@ Return your response as a JSON object with a "terms" array containing objects wi
 
         // Validate each suggested term against LOC
         const validatedTerms: ValidatedTerm[] = [];
-        const resultData = result.object as { terms: Array<{ suggestedHeading: string }> } | null;
-        let terms: Array<{ suggestedHeading: string }> = [];
+        const resultData = result.object as { terms: Array<{ suggestedHeading: string; reason: string }> } | null;
+        let terms: Array<{ suggestedHeading: string; reason: string }> = [];
 
         // Handle different response formats
         if (resultData?.terms && Array.isArray(resultData.terms)) {
@@ -291,11 +293,11 @@ Return your response as a JSON object with a "terms" array containing objects wi
             const parsed = JSON.parse(rawText);
             // Handle alternative formats like {"LCSH_terms": [...]}
             if (parsed.LCSH_terms && Array.isArray(parsed.LCSH_terms)) {
-              terms = parsed.LCSH_terms.map((term: string) => ({ suggestedHeading: term }));
+              terms = parsed.LCSH_terms.map((term: string) => ({ suggestedHeading: term, reason: "No reason provided" }));
             } else if (parsed.terms && Array.isArray(parsed.terms)) {
               // Handle array of strings
-              terms = parsed.terms.map((term: string | { suggestedHeading: string }) => 
-                typeof term === 'string' ? { suggestedHeading: term } : term
+              terms = parsed.terms.map((term: string | { suggestedHeading: string; reason?: string }) => 
+                typeof term === 'string' ? { suggestedHeading: term, reason: "No reason provided" } : { suggestedHeading: term.suggestedHeading, reason: term.reason || "No reason provided" }
               );
             }
           } catch (parseError) {
@@ -326,6 +328,7 @@ Return your response as a JSON object with a "terms" array containing objects wi
 
             validatedTerms.push({
               suggestedHeading: suggested,
+              reason: term.reason || "No reason provided",
               validatedHeading: bestMatch.heading,
               locUri: bestMatch.uri,
               matchType,
@@ -336,6 +339,7 @@ Return your response as a JSON object with a "terms" array containing objects wi
             // No results found - mark as unvalidated
             validatedTerms.push({
               suggestedHeading: suggested,
+              reason: term.reason || "No reason provided",
               validatedHeading: suggested,
               locUri: "",
               matchType: "closest",
@@ -353,7 +357,7 @@ Return your response as a JSON object with a "terms" array containing objects wi
         // Fallback: try to parse the response even if schema validation failed
         console.warn("Structured output validation failed, attempting to parse response:", structuredError);
         
-        let terms: Array<{ suggestedHeading: string }> = [];
+        let terms: Array<{ suggestedHeading: string; reason?: string }> = [];
         
         // Try to extract the response from the error
         if (structuredError?.value) {
@@ -366,7 +370,7 @@ Return your response as a JSON object with a "terms" array containing objects wi
             if (parsed.LCSH_terms && Array.isArray(parsed.LCSH_terms)) {
               terms = parsed.LCSH_terms.map((term: string) => ({ suggestedHeading: term }));
             } else if (parsed.terms && Array.isArray(parsed.terms)) {
-              terms = parsed.terms.map((term: string | { suggestedHeading: string }) => 
+              terms = parsed.terms.map((term: string | { suggestedHeading: string; reason?: string }) => 
                 typeof term === 'string' ? { suggestedHeading: term } : term
               );
             } else if (Array.isArray(parsed)) {
@@ -400,6 +404,7 @@ Return your response as a JSON object with a "terms" array containing objects wi
               const bestMatch = resultsWithSimilarity[0];
               validatedTerms.push({
                 suggestedHeading: suggested,
+                reason: term.reason || "No reason provided",
                 validatedHeading: bestMatch.heading,
                 locUri: bestMatch.uri,
                 matchType: bestMatch.similarity >= 90 ? "exact" : "closest",
@@ -409,6 +414,7 @@ Return your response as a JSON object with a "terms" array containing objects wi
             } else {
               validatedTerms.push({
                 suggestedHeading: suggested,
+                reason: term.reason || "No reason provided",
                 validatedHeading: suggested,
                 locUri: "",
                 matchType: "closest",
@@ -461,6 +467,7 @@ Return your response as a JSON object with a "terms" array containing objects wi
             const bestMatch = resultsWithSimilarity[0];
             validatedTerms.push({
               suggestedHeading: suggested,
+              reason: "Generated in fallback mode - reason not available",
               validatedHeading: bestMatch.heading,
               locUri: bestMatch.uri,
               matchType: bestMatch.similarity >= 90 ? "exact" : "closest",
@@ -470,6 +477,7 @@ Return your response as a JSON object with a "terms" array containing objects wi
           } else {
             validatedTerms.push({
               suggestedHeading: suggested,
+              reason: "Generated in fallback mode - reason not available",
               validatedHeading: suggested,
               locUri: "",
               matchType: "closest",
