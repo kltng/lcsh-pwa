@@ -735,7 +735,7 @@ export default function SettingsPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as ProviderGroup)}>
+            <Tabs value={activeTab} onValueChange={(v: string) => setActiveTab(v as ProviderGroup)}>
               <TabsList className="grid w-full grid-cols-3">
                 <TabsTrigger value="cloud">Cloud Providers</TabsTrigger>
                 <TabsTrigger value="local">Local Models</TabsTrigger>
