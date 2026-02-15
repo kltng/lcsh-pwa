@@ -5,10 +5,7 @@ import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { createAnthropic } from "@ai-sdk/anthropic";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { getModelsByProvider, getModelSDKConfig, type ExtendedModelInfo } from "@/lib/models";
-import { getProviderHardcodedBaseURL, LOCAL_PROVIDERS } from "@/lib/provider-groups";
-
-// Local providers that serve dynamic models - don't validate against registry
-const LOCAL_PROVIDER_IDS = LOCAL_PROVIDERS.map(p => p.id);
+import { getProviderHardcodedBaseURL } from "@/lib/provider-groups";
 
 export async function POST(request: NextRequest) {
   try {
@@ -29,33 +26,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check if this is a local provider (lmstudio, ollama)
-    const isLocalProvider = LOCAL_PROVIDER_IDS.includes(provider);
+    const providerModels = await getModelsByProvider(provider);
+    const modelInfo = providerModels.find((m) => m.id === modelId) || null;
 
-    let modelInfo: ExtendedModelInfo | null = null;
-
-    if (isLocalProvider) {
-      // For local providers, create a synthetic modelInfo using the provided modelId
-      // Local providers serve dynamic models that aren't in our registry
-      const hardcodedBaseURL = getProviderHardcodedBaseURL(provider);
-      modelInfo = {
-        id: modelId,
-        name: modelId,
-        provider: provider,
-        providerName: provider === 'lmstudio' ? 'LM Studio' : 'Ollama',
-        baseURL: hardcodedBaseURL || baseURL,
-      };
-    } else {
-      // For cloud providers, validate model exists in registry
-      const providerModels = await getModelsByProvider(provider);
-      modelInfo = providerModels.find((m) => m.id === modelId) || null;
-
-      if (!modelInfo) {
-        return NextResponse.json(
-          { error: `Model ${modelId} not found for provider ${provider}` },
-          { status: 404 }
-        );
-      }
+    if (!modelInfo) {
+      return NextResponse.json(
+        { error: `Model ${modelId} not found for provider ${provider}` },
+        { status: 404 }
+      );
     }
 
     // Get API key for provider
@@ -88,8 +66,7 @@ export async function POST(request: NextRequest) {
       finalApiKey = apiKey;
     }
 
-    const requiresApiKey = provider !== "lmstudio" && provider !== "ollama";
-    if (!finalApiKey && requiresApiKey) {
+    if (!finalApiKey) {
       return NextResponse.json(
         {
           error: `No API key found for provider ${provider}. Please add one in Settings.`,
@@ -99,24 +76,11 @@ export async function POST(request: NextRequest) {
     }
 
     // Determine SDK configuration
-    let sdkProvider: "openai" | "google" | "anthropic" | "openai-compatible";
-    let modelName: string;
-    let effectiveBaseURL: string;
-
-    if (isLocalProvider) {
-      // Local providers always use OpenAI-compatible SDK with their base URL
-      sdkProvider = "openai-compatible";
-      modelName = modelId;
-      const hardcodedBaseURL = getProviderHardcodedBaseURL(provider);
-      effectiveBaseURL = baseURL || hardcodedBaseURL || "";
-    } else {
-      // Cloud providers use SDK config from registry
-      const sdkConfig = getModelSDKConfig(modelInfo!);
-      sdkProvider = sdkConfig.provider;
-      modelName = sdkConfig.modelId;
-      const hardcodedBaseURL = getProviderHardcodedBaseURL(provider);
-      effectiveBaseURL = baseURL || hardcodedBaseURL || sdkConfig.baseURL || "";
-    }
+    const sdkConfig = getModelSDKConfig(modelInfo);
+    const sdkProvider = sdkConfig.provider;
+    const modelName = sdkConfig.modelId;
+    const hardcodedBaseURL = getProviderHardcodedBaseURL(provider);
+    const effectiveBaseURL = baseURL || hardcodedBaseURL || sdkConfig.baseURL || "";
 
     let model: any;
     if (sdkProvider === "openai") {

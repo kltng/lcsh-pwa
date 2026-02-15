@@ -1,9 +1,9 @@
 /**
  * Provider Grouping Configuration
- * Organizes AI providers into 3 groups with specific configuration requirements
+ * Organizes AI providers into 2 groups with specific configuration requirements
  */
 
-export type ProviderGroup = 'cloud' | 'local' | 'openai-compatible';
+export type ProviderGroup = 'cloud' | 'openai-compatible';
 
 export interface ProviderGroupConfig {
   id: ProviderGroup;
@@ -37,12 +37,6 @@ export const CLOUD_PROVIDERS: ProviderWithGroup[] = [
   { id: 'minimax', name: 'Minimax', group: 'cloud', hardcodedBaseURL: 'https://api.minimax.chat/v1' },
 ];
 
-// Local model apps - BaseURL with sensible default, API key optional
-export const LOCAL_PROVIDERS: ProviderWithGroup[] = [
-  { id: 'lmstudio', name: 'LM Studio', group: 'local', hardcodedBaseURL: 'http://127.0.0.1:1234/v1' },
-  { id: 'ollama', name: 'Ollama', group: 'local', hardcodedBaseURL: 'http://127.0.0.1:11434/v1' },
-];
-
 // Group configuration - defines fields and behavior for each group
 export const GROUP_CONFIGS: Record<ProviderGroup, ProviderGroupConfig> = {
   cloud: {
@@ -50,14 +44,6 @@ export const GROUP_CONFIGS: Record<ProviderGroup, ProviderGroupConfig> = {
     label: 'Popular Cloud Providers',
     description: 'Major AI providers with their own APIs. API key required.',
     fields: { apiKey: 'required', baseURL: 'hidden', providerLabel: 'hidden' },
-    supportsModelFetch: true,
-  },
-  local: {
-    id: 'local',
-    label: 'Local Model Apps',
-    description: 'Run models locally on your machine. Configure the BaseURL to connect.',
-    fields: { apiKey: 'optional', baseURL: 'optional', providerLabel: 'hidden' },
-    defaultBaseURL: 'http://127.0.0.1:1234/v1',
     supportsModelFetch: true,
   },
   'openai-compatible': {
@@ -74,7 +60,6 @@ export const GROUP_CONFIGS: Record<ProviderGroup, ProviderGroupConfig> = {
  */
 export function getProviderGroup(providerId: string): ProviderGroup {
   if (CLOUD_PROVIDERS.some(p => p.id === providerId)) return 'cloud';
-  if (LOCAL_PROVIDERS.some(p => p.id === providerId)) return 'local';
   return 'openai-compatible';
 }
 
@@ -90,16 +75,14 @@ export function getGroupConfig(group: ProviderGroup): ProviderGroupConfig {
  */
 export function getProviderHardcodedBaseURL(providerId: string): string | undefined {
   const cloud = CLOUD_PROVIDERS.find(p => p.id === providerId);
-  if (cloud?.hardcodedBaseURL) return cloud.hardcodedBaseURL;
-  const local = LOCAL_PROVIDERS.find(p => p.id === providerId);
-  return local?.hardcodedBaseURL;
+  return cloud?.hardcodedBaseURL;
 }
 
 /**
  * Get provider metadata by ID
  */
 export function getProviderById(providerId: string): ProviderWithGroup | undefined {
-  return [...CLOUD_PROVIDERS, ...LOCAL_PROVIDERS].find(p => p.id === providerId);
+  return CLOUD_PROVIDERS.find(p => p.id === providerId);
 }
 
 /**
@@ -108,7 +91,6 @@ export function getProviderById(providerId: string): ProviderWithGroup | undefin
 export function getAllGroupedProviders(): Record<ProviderGroup, ProviderWithGroup[]> {
   return {
     cloud: CLOUD_PROVIDERS,
-    local: LOCAL_PROVIDERS,
     'openai-compatible': [],
   };
 }

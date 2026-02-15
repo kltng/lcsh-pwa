@@ -7,10 +7,8 @@ import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { getModelsByProvider, getModelSDKConfig, type ExtendedModelInfo } from "@/lib/models";
 import { searchLcsh, type LcshResult } from "@/lib/lcsh";
 import { calculateSimilarity } from "@/lib/similarity";
-import { getProviderHardcodedBaseURL, LOCAL_PROVIDERS } from "@/lib/provider-groups";
+import { getProviderHardcodedBaseURL } from "@/lib/provider-groups";
 import { z } from "zod";
-
-const LOCAL_PROVIDER_IDS = LOCAL_PROVIDERS.map(p => p.id);
 
 // Schema for structured LCSH suggestions
 const lcshSuggestionSchema = z.object({
@@ -97,49 +95,30 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const isLocalProvider = LOCAL_PROVIDER_IDS.includes(provider);
-    let modelInfo: ExtendedModelInfo | null = null;
+    console.log("Looking up model:", modelId, "from provider:", provider);
+    
+    const providerModels = await getModelsByProvider(provider);
+    const modelInfo = providerModels.find((m) => m.id === modelId) || null;
+    
+    console.log("Model info found:", modelInfo ? { 
+      id: modelInfo.id, 
+      name: modelInfo.name, 
+      provider: modelInfo.provider,
+      providerName: modelInfo.providerName 
+    } : null);
 
-    if (isLocalProvider) {
-      const hardcodedBaseURL = getProviderHardcodedBaseURL(provider);
-      modelInfo = {
-        id: modelId,
-        name: modelId,
-        provider: provider,
-        providerName: provider === 'lmstudio' ? 'LM Studio' : 'Ollama',
-        baseURL: hardcodedBaseURL || baseURL,
-      };
-      console.log("Using local provider with dynamic model:", { 
-        provider, 
-        modelId, 
-        baseURL: modelInfo.baseURL 
-      });
-    } else {
-      console.log("Looking up model:", modelId, "from provider:", provider);
+    if (!modelInfo) {
+      const availableModels = providerModels.slice(0, 5).map(m => m.id);
       
-      const providerModels = await getModelsByProvider(provider);
-      modelInfo = providerModels.find((m) => m.id === modelId) || null;
-      
-      console.log("Model info found:", modelInfo ? { 
-        id: modelInfo.id, 
-        name: modelInfo.name, 
-        provider: modelInfo.provider,
-        providerName: modelInfo.providerName 
-      } : null);
-
-      if (!modelInfo) {
-        const availableModels = providerModels.slice(0, 5).map(m => m.id);
-        
-        return NextResponse.json(
-          {
-            error: `Model ${modelId} not found for provider ${provider}`,
-            suggestion: availableModels.length > 0 
-              ? `Available models from ${provider}: ${availableModels.join(", ")}` 
-              : `No models found for provider ${provider}`
-          },
-          { status: 404 }
-        );
-      }
+      return NextResponse.json(
+        {
+          error: `Model ${modelId} not found for provider ${provider}`,
+          suggestion: availableModels.length > 0 
+            ? `Available models from ${provider}: ${availableModels.join(", ")}` 
+            : `No models found for provider ${provider}`
+        },
+        { status: 404 }
+      );
     }
 
     // Get API key for provider
@@ -173,8 +152,7 @@ export async function POST(request: NextRequest) {
       finalApiKey = apiKey;
     }
 
-    const requiresApiKey = provider !== "lmstudio" && provider !== "ollama";
-    if (!finalApiKey && requiresApiKey) {
+    if (!finalApiKey) {
       return NextResponse.json(
         {
           error: `No API key found for provider ${provider}. Please add one in Settings.`,
@@ -183,22 +161,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    let sdkProvider: "openai" | "google" | "anthropic" | "openai-compatible";
-    let modelName: string;
-    let effectiveBaseURL: string;
-
-    if (isLocalProvider) {
-      sdkProvider = "openai-compatible";
-      modelName = modelId;
-      const hardcodedBaseURL = getProviderHardcodedBaseURL(provider);
-      effectiveBaseURL = baseURL || hardcodedBaseURL || "";
-    } else {
-      const sdkConfig = getModelSDKConfig(modelInfo!);
-      sdkProvider = sdkConfig.provider;
-      modelName = sdkConfig.modelId;
-      const hardcodedBaseURL = getProviderHardcodedBaseURL(provider);
-      effectiveBaseURL = baseURL || hardcodedBaseURL || sdkConfig.baseURL || "";
-    }
+    const sdkConfig = getModelSDKConfig(modelInfo);
+    const sdkProvider = sdkConfig.provider;
+    const modelName = sdkConfig.modelId;
+    const hardcodedBaseURL = getProviderHardcodedBaseURL(provider);
+    const effectiveBaseURL = baseURL || hardcodedBaseURL || sdkConfig.baseURL || "";
 
     console.log("Using SDK config:", { 
       sdkProvider, 

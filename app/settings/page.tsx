@@ -21,9 +21,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Loader2, CheckCircle2, AlertCircle, RefreshCw } from "lucide-react";
 import {
   CLOUD_PROVIDERS,
-  LOCAL_PROVIDERS,
   getProviderGroup,
-  getProviderHardcodedBaseURL,
   type ProviderGroup,
   type ProviderWithGroup,
 } from "@/lib/provider-groups";
@@ -58,7 +56,6 @@ export default function SettingsPage() {
   const [newKeyLabel, setNewKeyLabel] = useState("");
   const [providerApiKeys, setProviderApiKeys] = useState<ApiKey[]>([]);
   
-  const [localBaseURL, setLocalBaseURL] = useState("");
   const [customBaseURL, setCustomBaseURL] = useState("");
   const [customLabel, setCustomLabel] = useState("");
   const [fetchingModels, setFetchingModels] = useState(false);
@@ -77,11 +74,8 @@ export default function SettingsPage() {
       setProviderApiKeys(keys);
       
       const config = getProviderConfig(provider);
-      const hardcoded = getProviderHardcodedBaseURL(provider);
       
-      if (group === 'local') {
-        setLocalBaseURL(config?.baseURL || hardcoded || "http://127.0.0.1:1234/v1");
-      } else if (group === 'openai-compatible') {
+      if (group === 'openai-compatible') {
         setCustomBaseURL(config?.baseURL || "");
         setCustomLabel(config?.label || "");
       }
@@ -92,7 +86,6 @@ export default function SettingsPage() {
     } else {
       setModels([]);
       setProviderApiKeys([]);
-      setLocalBaseURL("");
       setCustomBaseURL("");
       setCustomLabel("");
     }
@@ -189,13 +182,8 @@ export default function SettingsPage() {
     setModels([]);
     
     const group = getProviderGroup(providerId);
-    const hardcoded = getProviderHardcodedBaseURL(providerId);
     
-    if (group === 'local') {
-      const config = getProviderConfig(providerId);
-      const url = config?.baseURL || hardcoded || "http://127.0.0.1:1234/v1";
-      setLocalBaseURL(url);
-    } else if (group === 'openai-compatible') {
+    if (group === 'openai-compatible') {
       const config = getProviderConfig(providerId);
       setCustomBaseURL(config?.baseURL || "");
       setCustomLabel(config?.label || "");
@@ -205,12 +193,7 @@ export default function SettingsPage() {
   }
 
   function handleBaseURLChange(url: string) {
-    if (activeTab === 'local') {
-      setLocalBaseURL(url);
-      if (provider) {
-        setProviderConfig({ provider, baseURL: url });
-      }
-    } else if (activeTab === 'openai-compatible') {
+    if (activeTab === 'openai-compatible') {
       setCustomBaseURL(url);
       if (provider) {
         setProviderConfig({ provider, baseURL: url, label: customLabel });
@@ -256,7 +239,7 @@ export default function SettingsPage() {
     const group = getProviderGroup(provider || "");
     const testApiKey = getApiKeyForProvider(provider || "");
     const effectiveModelId = modelId;
-    const effectiveBaseURL = group === 'local' ? localBaseURL : group === 'openai-compatible' ? customBaseURL : undefined;
+    const effectiveBaseURL = group === 'openai-compatible' ? customBaseURL : undefined;
     
     if (!effectiveModelId) {
       setTestResult({
@@ -317,7 +300,6 @@ export default function SettingsPage() {
     } catch (err) {
       console.error("Test connection failed:", err);
       let errorMessage = "Connection failed. Please check your configuration.";
-      const isLocal = getProviderGroup(provider || "") === 'local';
       
       if (err instanceof Error) {
         errorMessage = err.message;
@@ -330,13 +312,7 @@ export default function SettingsPage() {
         } else if (err.message.includes("429") || err.message.includes("rate limit")) {
           errorMessage = "Rate limit exceeded. Please try again later.";
         } else if (err.message.includes("network") || err.message.includes("fetch") || err.message.includes("connect") || err.message.includes("ECONNREFUSED")) {
-          if (isLocal) {
-            const providerName = provider === 'lmstudio' ? 'LM Studio' : 'Ollama';
-            const defaultPort = provider === 'lmstudio' ? '1234' : '11434';
-            errorMessage = `Cannot connect to ${providerName} at ${localBaseURL}. Make sure ${providerName} is running and the model is loaded. Default port is ${defaultPort}.`;
-          } else {
-            errorMessage = "Network error. Please check the BaseURL and your internet connection.";
-          }
+          errorMessage = "Network error. Please check the BaseURL and your internet connection.";
         }
       }
 
@@ -351,7 +327,6 @@ export default function SettingsPage() {
 
   function getProviderOptionsForTab(tab: ProviderGroup): ProviderWithGroup[] {
     if (tab === 'cloud') return CLOUD_PROVIDERS;
-    if (tab === 'local') return LOCAL_PROVIDERS;
     return [];
   }
 
@@ -381,10 +356,7 @@ export default function SettingsPage() {
   function renderBaseURLField(group: ProviderGroup) {
     if (group === 'cloud') return null;
     
-    const url = group === 'local' ? localBaseURL : customBaseURL;
-    const defaultURL = group === 'local' 
-      ? (getProviderHardcodedBaseURL(provider || "") || "http://127.0.0.1:1234/v1")
-      : "";
+    const url = customBaseURL;
     
     return (
       <div className="space-y-2">
@@ -394,14 +366,14 @@ export default function SettingsPage() {
             id="baseURL"
             value={url}
             onChange={(e) => handleBaseURLChange(e.target.value)}
-            placeholder={defaultURL || "https://api.example.com/v1"}
+            placeholder="https://api.example.com/v1"
             className="flex-1"
           />
           <Button
             variant="outline"
             size="icon"
-            onClick={() => fetchModelsFromEndpoint(url || defaultURL)}
-            disabled={fetchingModels || !(url || defaultURL)}
+            onClick={() => fetchModelsFromEndpoint(url)}
+            disabled={fetchingModels || !url}
             title="Fetch models from endpoint"
           >
             {fetchingModels ? (
@@ -411,11 +383,6 @@ export default function SettingsPage() {
             )}
           </Button>
         </div>
-        {group === 'local' && (
-          <p className="text-xs text-muted-foreground">
-            Default: {defaultURL}
-          </p>
-        )}
       </div>
     );
   }
@@ -749,26 +716,13 @@ export default function SettingsPage() {
           </CardHeader>
           <CardContent>
             <Tabs value={activeTab} onValueChange={(v: string) => setActiveTab(v as ProviderGroup)}>
-              <TabsList className="grid w-full grid-cols-3">
+              <TabsList className="grid w-full grid-cols-2">
                 <TabsTrigger value="cloud">Cloud Providers</TabsTrigger>
-                <TabsTrigger value="local">Local Models</TabsTrigger>
                 <TabsTrigger value="openai-compatible">Custom Endpoints</TabsTrigger>
               </TabsList>
               
               <TabsContent value="cloud" className="mt-4">
                 {renderConfigPanel('cloud')}
-              </TabsContent>
-              
-              <TabsContent value="local" className="mt-4">
-                {isDeployedEnv && (
-                  <Alert variant="destructive" className="mb-4">
-                    <AlertCircle className="h-4 w-4" />
-                    <AlertDescription>
-                      <strong>Local models require a locally-running app.</strong> This app is running on a remote server and cannot connect to LM Studio or Ollama on your machine. To use local models, run this app locally with <code className="px-1 py-0.5 bg-muted rounded text-xs">npm run dev</code> or self-host it.
-                    </AlertDescription>
-                  </Alert>
-                )}
-                {renderConfigPanel('local')}
               </TabsContent>
               
               <TabsContent value="openai-compatible" className="mt-4">

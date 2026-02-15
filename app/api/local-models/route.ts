@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 
 /**
- * Local Models API Route
- * Fetches available models from local providers (LM Studio, Ollama)
- * Both expose OpenAI-compatible /v1/models endpoint
+ * OpenAI-Compatible Models API Route
+ * Fetches available models from any OpenAI-compatible endpoint
+ * Used by Custom Endpoints configuration in Settings
  */
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
@@ -42,7 +42,7 @@ export async function GET(request: NextRequest) {
 
     const data = await response.json();
     
-    // Normalize response - both LM Studio and Ollama return OpenAI-compatible format
+    // Normalize response - OpenAI-compatible endpoints return:
     // { data: [{ id: "model-name", object: "model", ... }, ...] }
     const models = data.data?.map((m: { id: string; name?: string }) => ({
       id: m.id,
@@ -54,13 +54,13 @@ export async function GET(request: NextRequest) {
     if (error instanceof Error) {
       if (error.name === 'TimeoutError' || error.message.includes('abort')) {
         return NextResponse.json(
-          { error: 'Connection timeout. Is the local server running?' },
+          { error: 'Connection timeout. Please try again.' },
           { status: 504 }
         );
       }
       if (error.message.includes('fetch')) {
         return NextResponse.json(
-          { error: `Cannot connect to ${baseURL}. Is the server running?` },
+          { error: `Cannot connect to ${baseURL}. Please check the URL and your network.` },
           { status: 503 }
         );
       }
@@ -70,7 +70,7 @@ export async function GET(request: NextRequest) {
       );
     }
     return NextResponse.json(
-      { error: 'Failed to fetch models from local endpoint' },
+      { error: 'Failed to fetch models from endpoint' },
       { status: 500 }
     );
   }

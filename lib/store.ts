@@ -144,6 +144,26 @@ const migrateApiKeys = (state: AppStore): AppStore => {
   return state;
 };
 
+// Deprecated local providers that should be reset
+const DEPRECATED_PROVIDERS = ['lmstudio', 'ollama'];
+
+// Migration logic for deprecated providers
+const migrateDeprecatedProviders = (state: AppStore): AppStore => {
+  // If provider is a deprecated local provider, reset it
+  if (state.provider && DEPRECATED_PROVIDERS.includes(state.provider)) {
+    return {
+      ...state,
+      provider: null,
+      modelId: null,
+      // Also clean up any API keys for deprecated providers
+      apiKeys: state.apiKeys.filter(k => !DEPRECATED_PROVIDERS.includes(k.provider)),
+      // Clean up provider configs for deprecated providers
+      providerConfigs: state.providerConfigs.filter(c => !DEPRECATED_PROVIDERS.includes(c.provider)),
+    };
+  }
+  return state;
+};
+
 export const useAppStore = create<AppStore>()(
   persist(
     (set, get) => ({
@@ -312,7 +332,8 @@ export const useAppStore = create<AppStore>()(
             return;
           }
           if (state) {
-            const migrated = migrateApiKeys(state);
+            let migrated = migrateApiKeys(state);
+            migrated = migrateDeprecatedProviders(migrated);
             if (migrated !== state) {
               // Update the store with migrated data
               useAppStore.setState(migrated);

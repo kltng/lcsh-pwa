@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 const MODEL_ENDPOINTS: Record<string, { 
-  url: string; 
+  url: string | ((key: string) => string); 
   headers: (key: string) => Record<string, string>;
   transform: (data: any) => { id: string; name: string }[];
 }> = {
@@ -40,13 +40,13 @@ const MODEL_ENDPOINTS: Record<string, {
     })),
   },
   google: {
-    url: "https://generativelanguage.googleapis.com/v1beta/models",
-    headers: (key) => ({ "Content-Type": "application/json" }),
+    url: (key) => `https://generativelanguage.googleapis.com/v1beta/models?key=${key}`,
+    headers: () => ({ "Content-Type": "application/json" }),
     transform: (data) => (data.models || []).map((m: any) => {
       const id = m.name.replace('models/', '');
       return { id, name: m.displayName || id };
     }).filter((m: any) => 
-      m.id.includes('gemini') || m.id.includes('claude')
+      m.id.includes('gemini')
     ),
   },
   deepseek: {
@@ -120,7 +120,8 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const response = await fetch(endpoint.url, {
+    const url = typeof endpoint.url === 'function' ? endpoint.url(apiKey) : endpoint.url;
+    const response = await fetch(url, {
       method: 'GET',
       headers: endpoint.headers(apiKey),
       signal: AbortSignal.timeout(15000),
