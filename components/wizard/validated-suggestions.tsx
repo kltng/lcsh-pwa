@@ -11,6 +11,7 @@ import { extractIdentifier } from "@/lib/loc";
 
 export interface ValidatedTerm {
     suggestedHeading: string;
+    reason: string;
     validatedHeading: string;
     locUri: string;
     matchType: "exact" | "closest";
@@ -52,6 +53,7 @@ export function ValidatedSuggestions({
                     uri: term.locUri,
                 }
                 : undefined,
+            justification: term.reason,
         }));
 
         setFinalRecommendations(recommendations);
@@ -132,6 +134,12 @@ export function ValidatedSuggestions({
                             </div>
                         </CardHeader>
                         <CardContent className="space-y-3">
+                            {term.reason && (
+                                <div className="bg-muted/50 rounded-md p-3">
+                                    <span className="font-medium text-sm">AI Reasoning:</span>
+                                    <p className="text-sm text-muted-foreground mt-1">{term.reason}</p>
+                                </div>
+                            )}
                             {term.locUri ? (
                                 <>
                                     <div className="flex items-start gap-2">

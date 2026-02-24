@@ -57,13 +57,6 @@ export const PROVIDERS: ProviderInfo[] = [
     description: "Qwen models from Alibaba Cloud",
   },
   {
-    id: "lmstudio",
-    name: "LM Studio",
-    baseURL: "http://127.0.0.1:1234/v1",
-    apiKeyEnv: "LMSTUDIO_API_KEY",
-    description: "Local models via LM Studio (OpenAI-compatible)",
-  },
-  {
     id: "together",
     name: "Together AI",
     baseURL: "https://api.together.xyz/v1",
@@ -130,12 +123,6 @@ export const MODELS: ModelInfo[] = [
   { id: "qwen-turbo", name: "Qwen Turbo", provider: "qwen", providerName: "Qwen", baseURL: "https://dashscope.aliyuncs.com/compatible-mode/v1" },
   { id: "qwen-plus", name: "Qwen Plus", provider: "qwen", providerName: "Qwen", baseURL: "https://dashscope.aliyuncs.com/compatible-mode/v1" },
   { id: "qwen-max", name: "Qwen Max", provider: "qwen", providerName: "Qwen", baseURL: "https://dashscope.aliyuncs.com/compatible-mode/v1" },
-  
-  // LM Studio (common local models)
-  { id: "gpt-3.5-turbo", name: "GPT-3.5 Turbo (Local)", provider: "lmstudio", providerName: "LM Studio", baseURL: "http://127.0.0.1:1234/v1" },
-  { id: "llama-2-7b-chat", name: "Llama 2 7B Chat (Local)", provider: "lmstudio", providerName: "LM Studio", baseURL: "http://127.0.0.1:1234/v1" },
-  { id: "mistral-7b-instruct", name: "Mistral 7B Instruct (Local)", provider: "lmstudio", providerName: "LM Studio", baseURL: "http://127.0.0.1:1234/v1" },
-  { id: "custom", name: "Custom Model (Local)", provider: "lmstudio", providerName: "LM Studio", baseURL: "http://127.0.0.1:1234/v1" },
   
   // Together AI
   { id: "meta-llama/Llama-2-70b-chat-hf", name: "Llama 2 70B Chat", provider: "together", providerName: "Together AI", baseURL: "https://api.together.xyz/v1" },

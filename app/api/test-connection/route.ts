@@ -4,12 +4,9 @@ import { createOpenAI } from "@ai-sdk/openai";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { createAnthropic } from "@ai-sdk/anthropic";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
-import { getModelsByProvider, getModelSDKConfig } from "@/lib/models";
+import { getModelsByProvider, getModelSDKConfig, type ExtendedModelInfo } from "@/lib/models";
+import { getProviderHardcodedBaseURL } from "@/lib/provider-groups";
 
-/**
- * Simple connection test endpoint
- * Just verifies the API key and model work, without running full LCSH generation
- */
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
@@ -19,6 +16,7 @@ export async function POST(request: NextRequest) {
       apiKeys,
       providerKeyId,
       provider,
+      baseURL,
     } = body;
 
     if (!modelId || !provider) {
@@ -28,9 +26,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get model info
     const providerModels = await getModelsByProvider(provider);
-    const modelInfo = providerModels.find((m) => m.id === modelId);
+    const modelInfo = providerModels.find((m) => m.id === modelId) || null;
 
     if (!modelInfo) {
       return NextResponse.json(
@@ -69,8 +66,7 @@ export async function POST(request: NextRequest) {
       finalApiKey = apiKey;
     }
 
-    const requiresApiKey = provider !== "lmstudio";
-    if (!finalApiKey && requiresApiKey) {
+    if (!finalApiKey) {
       return NextResponse.json(
         {
           error: `No API key found for provider ${provider}. Please add one in Settings.`,
@@ -79,25 +75,27 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get SDK config
+    // Determine SDK configuration
     const sdkConfig = getModelSDKConfig(modelInfo);
+    const sdkProvider = sdkConfig.provider;
     const modelName = sdkConfig.modelId;
+    const hardcodedBaseURL = getProviderHardcodedBaseURL(provider);
+    const effectiveBaseURL = baseURL || hardcodedBaseURL || sdkConfig.baseURL || "";
 
-    // Create model client
     let model: any;
-    if (sdkConfig.provider === "openai") {
+    if (sdkProvider === "openai") {
       const openaiClient = createOpenAI({ apiKey: finalApiKey });
       model = openaiClient(modelName);
-    } else if (sdkConfig.provider === "google") {
+    } else if (sdkProvider === "google") {
       const googleClient = createGoogleGenerativeAI({ apiKey: finalApiKey });
       model = googleClient(modelName);
-    } else if (sdkConfig.provider === "anthropic") {
+    } else if (sdkProvider === "anthropic") {
       const anthropicClient = createAnthropic({ apiKey: finalApiKey });
       model = anthropicClient(modelName);
     } else {
       const openaiCompatible = createOpenAICompatible({
-        name: modelInfo.provider,
-        baseURL: sdkConfig.baseURL || "",
+        name: provider,
+        baseURL: effectiveBaseURL,
         apiKey: finalApiKey || "dummy",
       });
       model = openaiCompatible(modelName);

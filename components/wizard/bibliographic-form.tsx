@@ -125,7 +125,7 @@ export function BibliographicForm({ onValidatedTerms }: BibliographicFormProps) 
     }
 
     // Check for API key (either from apiKeys array or deprecated apiKey)
-    const hasApiKey = provider === "lmstudio" || getApiKeyForProvider(provider) || apiKey;
+    const hasApiKey = getApiKeyForProvider(provider) || apiKey;
     if (!hasApiKey) {
       setError("Please add an API key for this provider in Settings");
       return false;
