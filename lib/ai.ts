@@ -1,46 +1,9 @@
 /**
- * Universal AI Service
- * Provides a unified interface for generating LCSH suggestions using any AI model
+ * AI Response Parsing Utilities
+ * Pure parsing functions for AI responses (no server calls)
  */
 
-export interface BibliographicInfo {
-  title?: string;
-  author?: string;
-  abstract?: string;
-  tableOfContents?: string;
-  notes?: string;
-  images?: Array<{
-    data: string; // base64
-    name: string;
-    type: string;
-  }>;
-}
-
-export interface GenerateOptions {
-  modelId: string;
-  apiKey?: string; // Deprecated: kept for backward compatibility
-  apiKeys?: Array<{ id: string; provider: string; key: string; isDefault?: boolean }>; // NEW: array of API keys
-  providerKeyId?: string; // NEW: specific key ID to use (optional)
-  bibliographicInfo: BibliographicInfo;
-  systemPromptRules?: string;
-  provider?: string | null; // Selected provider to ensure correct model lookup
-}
-
-export interface MarcGenerationOptions {
-  modelId: string;
-  apiKey?: string; // Deprecated: kept for backward compatibility
-  apiKeys?: Array<{ id: string; provider: string; key: string; isDefault?: boolean }>; // NEW: array of API keys
-  providerKeyId?: string; // NEW: specific key ID to use (optional)
-  recommendations: Array<{
-    similarity: number;
-    bestMatch?: {
-      heading: string;
-      identifier?: string;
-    };
-    apiId?: string;
-  }>;
-  provider?: string | null; // Selected provider to ensure correct model lookup
-}
+export type { BibliographicInfo } from "./ai-pipeline";
 
 export interface AIResponse {
   text: string;
@@ -49,71 +12,6 @@ export interface AIResponse {
     completionTokens: number;
     totalTokens: number;
   };
-}
-
-/**
- * Generate LCSH suggestions using the configured AI model
- */
-export async function generateLcshSuggestions(
-  options: GenerateOptions
-): Promise<AIResponse> {
-  const requestBody = {
-    modelId: options.modelId,
-    bibliographicInfo: options.bibliographicInfo,
-    systemPromptRules: options.systemPromptRules || "",
-    promptType: "suggestions",
-    provider: options.provider,
-    ...(options.apiKey ? { apiKey: options.apiKey } : {}),
-    ...(options.apiKeys ? { apiKeys: options.apiKeys } : {}),
-    ...(options.providerKeyId ? { providerKeyId: options.providerKeyId } : {}),
-  };
-
-  const response = await fetch("/api/generate", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(requestBody),
-  });
-
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || "Failed to generate suggestions");
-  }
-
-  return await response.json();
-}
-
-/**
- * Generate MARC records for validated LCSH terms
- */
-export async function generateMarcRecords(
-  options: MarcGenerationOptions
-): Promise<AIResponse> {
-  const requestBody = {
-    modelId: options.modelId,
-    recommendations: options.recommendations,
-    promptType: "marc",
-    provider: options.provider,
-    ...(options.apiKey ? { apiKey: options.apiKey } : {}),
-    ...(options.apiKeys ? { apiKeys: options.apiKeys } : {}),
-    ...(options.providerKeyId ? { providerKeyId: options.providerKeyId } : {}),
-  };
-
-  const response = await fetch("/api/generate", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(requestBody),
-  });
-
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || "Failed to generate MARC records");
-  }
-
-  return await response.json();
 }
 
 /**

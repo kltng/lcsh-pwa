@@ -9,6 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Loader2, Upload, X } from "lucide-react";
+import { generateSuggestionsClientSide } from "@/lib/ai-pipeline";
 import type { ValidatedTerm } from "@/components/wizard/validated-suggestions";
 
 interface BibliographicFormProps {
@@ -155,33 +156,25 @@ export function BibliographicForm({ onValidatedTerms }: BibliographicFormProps) 
         images: imageData,
       };
 
-      // Call the new structured API - MUST include provider for correct model lookup
-      const response = await fetch("/api/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          modelId,
-          apiKey, // Keep for backward compatibility
-          apiKeys: apiKeys.filter((k) => k.provider === provider), // Send apiKeys array
-          bibliographicInfo: enhancedBibliographicInfo,
-          systemPromptRules: systemPromptRules || "",
-          promptType: "suggestions",
-          provider, // Critical: pass provider to ensure correct model is used
-        }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to generate suggestions");
+      // Run AI + LOC validation entirely client-side (zero-knowledge)
+      const effectiveApiKey = getApiKeyForProvider(provider!) || apiKey;
+      if (!effectiveApiKey) {
+        throw new Error("No API key found for this provider");
       }
 
-      const data = await response.json();
+      const data = await generateSuggestionsClientSide({
+        modelId: modelId!,
+        provider: provider!,
+        apiKey: effectiveApiKey,
+        bibliographicInfo: enhancedBibliographicInfo,
+        systemPromptRules: systemPromptRules || "",
+      });
 
       if (data.validatedTerms) {
         onValidatedTerms(data.validatedTerms, data.subjectAnalysis);
         setActiveStep(1);
       } else {
-        throw new Error("No validated terms returned from API");
+        throw new Error("No validated terms returned");
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to generate LCSH suggestions");

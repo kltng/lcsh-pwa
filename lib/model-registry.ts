@@ -37,12 +37,6 @@ export const PROVIDERS: ProviderInfo[] = [
     description: "Google Gemini models",
   },
   {
-    id: "anthropic",
-    name: "Anthropic",
-    apiKeyEnv: "ANTHROPIC_API_KEY",
-    description: "Claude models from Anthropic",
-  },
-  {
     id: "deepseek",
     name: "DeepSeek",
     baseURL: "https://api.deepseek.com/v1",
@@ -105,14 +99,6 @@ export const MODELS: ModelInfo[] = [
   { id: "gemini-1.5-pro", name: "Gemini 1.5 Pro", provider: "google", providerName: "Google" },
   { id: "gemini-1.5-flash", name: "Gemini 1.5 Flash", provider: "google", providerName: "Google" },
   { id: "gemini-pro", name: "Gemini Pro", provider: "google", providerName: "Google" },
-  
-  // Anthropic
-  { id: "claude-sonnet-4-20250514", name: "Claude Sonnet 4", provider: "anthropic", providerName: "Anthropic" },
-  { id: "claude-3-7-sonnet-20250219", name: "Claude 3.7 Sonnet", provider: "anthropic", providerName: "Anthropic" },
-  { id: "claude-3-5-sonnet-20241022", name: "Claude 3.5 Sonnet", provider: "anthropic", providerName: "Anthropic" },
-  { id: "claude-3-opus-20240229", name: "Claude 3 Opus", provider: "anthropic", providerName: "Anthropic" },
-  { id: "claude-3-sonnet-20240229", name: "Claude 3 Sonnet", provider: "anthropic", providerName: "Anthropic" },
-  { id: "claude-3-haiku-20240307", name: "Claude 3 Haiku", provider: "anthropic", providerName: "Anthropic" },
   
   // DeepSeek
   { id: "deepseek-chat", name: "DeepSeek Chat", provider: "deepseek", providerName: "DeepSeek", baseURL: "https://api.deepseek.com/v1" },
@@ -204,7 +190,7 @@ export function getModelById(modelId: string): ModelInfo | null {
  * Get SDK configuration for a model
  */
 export function getModelSDKConfig(model: ModelInfo): {
-  provider: "openai" | "google" | "anthropic" | "openai-compatible";
+  provider: "openai" | "google" | "openai-compatible";
   baseURL?: string;
   modelId: string;
 } {
@@ -224,13 +210,6 @@ export function getModelSDKConfig(model: ModelInfo): {
   if (model.provider === "google") {
     return {
       provider: "google",
-      modelId: modelName,
-    };
-  }
-
-  if (model.provider === "anthropic") {
-    return {
-      provider: "anthropic",
       modelId: modelName,
     };
   }

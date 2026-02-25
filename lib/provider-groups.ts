@@ -28,7 +28,6 @@ export interface ProviderWithGroup {
 // Cloud providers - API key required, BaseURL hidden (hardcoded)
 export const CLOUD_PROVIDERS: ProviderWithGroup[] = [
   { id: 'openai', name: 'OpenAI', group: 'cloud' },
-  { id: 'anthropic', name: 'Anthropic', group: 'cloud' },
   { id: 'google', name: 'Google Gemini', group: 'cloud' },
   { id: 'deepseek', name: 'DeepSeek', group: 'cloud', hardcodedBaseURL: 'https://api.deepseek.com/v1' },
   { id: 'qwen', name: 'Qwen', group: 'cloud', hardcodedBaseURL: 'https://dashscope.aliyuncs.com/compatible-mode/v1' },
