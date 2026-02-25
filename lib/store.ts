@@ -27,10 +27,13 @@ export const DEFAULT_SYSTEM_PROMPT_RULES = `# LCSH Selection Rules
 export interface Recommendation {
   term: string;
   similarity: number;
+  source?: "lcsh" | "lcnaf";
+  isAdditional?: boolean;
   bestMatch?: {
     heading: string;
     identifier: string;
     uri: string;
+    source?: "lcsh" | "lcnaf";
   };
   apiId?: string;
   marc?: string;
@@ -41,6 +44,7 @@ export interface Conversation {
   id: string;
   timestamp: string;
   bibliographicInfo: BibliographicInfo;
+  subjectAnalysis?: string;
   initialSuggestions?: ParsedSuggestions;
   validationResults?: Record<string, LOCSearchResponse>;
   finalRecommendations?: Recommendation[];
@@ -94,6 +98,7 @@ interface SettingsState {
 interface WizardState {
   activeStep: number;
   bibliographicInfo: BibliographicInfo;
+  subjectAnalysis: string;
   initialSuggestions: ParsedSuggestions | null;
   validationResults: Record<string, LOCSearchResponse> | null;
   finalRecommendations: Recommendation[] | null;
@@ -102,6 +107,7 @@ interface WizardState {
   error: string | null;
   setActiveStep: (step: number) => void;
   setBibliographicInfo: (info: BibliographicInfo) => void;
+  setSubjectAnalysis: (analysis: string) => void;
   setInitialSuggestions: (suggestions: ParsedSuggestions | null) => void;
   setValidationResults: (results: Record<string, LOCSearchResponse> | null) => void;
   setFinalRecommendations: (recommendations: Recommendation[] | null) => void;
@@ -258,6 +264,7 @@ export const useAppStore = create<AppStore>()(
         notes: "",
         images: [],
       },
+      subjectAnalysis: "",
       initialSuggestions: null,
       validationResults: null,
       finalRecommendations: null,
@@ -266,6 +273,7 @@ export const useAppStore = create<AppStore>()(
       error: null,
       setActiveStep: (activeStep) => set({ activeStep }),
       setBibliographicInfo: (bibliographicInfo) => set({ bibliographicInfo }),
+      setSubjectAnalysis: (subjectAnalysis) => set({ subjectAnalysis }),
       setInitialSuggestions: (initialSuggestions) => set({ initialSuggestions }),
       setValidationResults: (validationResults) => set({ validationResults }),
       setFinalRecommendations: (finalRecommendations) =>
@@ -284,6 +292,7 @@ export const useAppStore = create<AppStore>()(
             notes: "",
             images: [],
           },
+          subjectAnalysis: "",
           initialSuggestions: null,
           validationResults: null,
           finalRecommendations: null,

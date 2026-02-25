@@ -16,8 +16,9 @@ const steps = [
 ];
 
 export default function WizardPage() {
-  const { activeStep, setActiveStep } = useAppStore();
+  const { activeStep, setActiveStep, setSubjectAnalysis: setStoreSubjectAnalysis } = useAppStore();
   const [validatedTerms, setValidatedTerms] = useState<ValidatedTerm[]>([]);
+  const [subjectAnalysis, setSubjectAnalysis] = useState<string>("");
 
   const progress = ((activeStep + 1) / steps.length) * 100;
 
@@ -26,8 +27,10 @@ export default function WizardPage() {
       case 0:
         return (
           <BibliographicForm
-            onValidatedTerms={(terms) => {
+            onValidatedTerms={(terms, analysis) => {
               setValidatedTerms(terms);
+              setSubjectAnalysis(analysis || "");
+              setStoreSubjectAnalysis(analysis || "");
             }}
           />
         );
@@ -35,6 +38,7 @@ export default function WizardPage() {
         return (
           <ValidatedSuggestions
             validatedTerms={validatedTerms}
+            subjectAnalysis={subjectAnalysis}
             onContinue={() => setActiveStep(2)}
             onBack={() => setActiveStep(0)}
           />
@@ -44,8 +48,10 @@ export default function WizardPage() {
       default:
         return (
           <BibliographicForm
-            onValidatedTerms={(terms) => {
+            onValidatedTerms={(terms, analysis) => {
               setValidatedTerms(terms);
+              setSubjectAnalysis(analysis || "");
+              setStoreSubjectAnalysis(analysis || "");
             }}
           />
         );

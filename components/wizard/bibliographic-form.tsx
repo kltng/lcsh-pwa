@@ -12,7 +12,7 @@ import { Loader2, Upload, X } from "lucide-react";
 import type { ValidatedTerm } from "@/components/wizard/validated-suggestions";
 
 interface BibliographicFormProps {
-  onValidatedTerms: (terms: ValidatedTerm[]) => void;
+  onValidatedTerms: (terms: ValidatedTerm[], subjectAnalysis?: string) => void;
 }
 
 export function BibliographicForm({ onValidatedTerms }: BibliographicFormProps) {
@@ -178,7 +178,7 @@ export function BibliographicForm({ onValidatedTerms }: BibliographicFormProps) 
       const data = await response.json();
 
       if (data.validatedTerms) {
-        onValidatedTerms(data.validatedTerms);
+        onValidatedTerms(data.validatedTerms, data.subjectAnalysis);
         setActiveStep(1);
       } else {
         throw new Error("No validated terms returned from API");

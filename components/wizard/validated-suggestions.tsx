@@ -16,17 +16,21 @@ export interface ValidatedTerm {
     locUri: string;
     matchType: "exact" | "closest";
     similarity: number;
-    alternatives: Array<{ heading: string; uri: string; similarity: number }>;
+    source?: "lcsh" | "lcnaf";
+    isAdditional?: boolean;
+    alternatives: Array<{ heading: string; uri: string; similarity: number; source?: "lcsh" | "lcnaf" }>;
 }
 
 interface ValidatedSuggestionsProps {
     validatedTerms: ValidatedTerm[];
+    subjectAnalysis?: string;
     onContinue: () => void;
     onBack: () => void;
 }
 
 export function ValidatedSuggestions({
     validatedTerms,
+    subjectAnalysis,
     onContinue,
     onBack,
 }: ValidatedSuggestionsProps) {
@@ -46,11 +50,14 @@ export function ValidatedSuggestions({
         const recommendations: Recommendation[] = validatedTerms.map((term) => ({
             term: term.suggestedHeading,
             similarity: term.similarity,
+            source: term.source,
+            isAdditional: term.isAdditional,
             bestMatch: term.locUri
                 ? {
                     heading: term.validatedHeading,
                     identifier: extractIdentifier(term.locUri),
                     uri: term.locUri,
+                    source: term.source,
                 }
                 : undefined,
             justification: term.reason,
@@ -88,6 +95,17 @@ export function ValidatedSuggestions({
                 </Alert>
             )}
 
+            {subjectAnalysis && (
+                <Card className="mb-4">
+                    <CardHeader>
+                        <CardTitle>Subject Analysis</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <p className="text-sm text-muted-foreground">{subjectAnalysis}</p>
+                    </CardContent>
+                </Card>
+            )}
+
             <Card>
                 <CardHeader>
                     <CardTitle>Validation Summary</CardTitle>
@@ -123,14 +141,26 @@ export function ValidatedSuggestions({
                                     )}
                                     <CardTitle className="text-lg">{term.suggestedHeading}</CardTitle>
                                 </div>
-                                <Badge
-                                    style={{
-                                        backgroundColor: getSimilarityColor(term.similarity),
-                                        color: "white",
-                                    }}
-                                >
-                                    {term.similarity}%
-                                </Badge>
+                                <div className="flex items-center gap-2">
+                                    {term.isAdditional && (
+                                        <Badge variant="outline" className="text-xs">
+                                            AI Additional
+                                        </Badge>
+                                    )}
+                                    {term.source && (
+                                        <Badge variant="secondary" className="text-xs">
+                                            {term.source.toUpperCase()}
+                                        </Badge>
+                                    )}
+                                    <Badge
+                                        style={{
+                                            backgroundColor: getSimilarityColor(term.similarity),
+                                            color: "white",
+                                        }}
+                                    >
+                                        {term.similarity}%
+                                    </Badge>
+                                </div>
                             </div>
                         </CardHeader>
                         <CardContent className="space-y-3">
@@ -170,6 +200,11 @@ export function ValidatedSuggestions({
                                                         >
                                                             {alt.heading}
                                                         </a>
+                                                        {alt.source && (
+                                                            <Badge variant="secondary" className="text-xs h-5">
+                                                                {alt.source.toUpperCase()}
+                                                            </Badge>
+                                                        )}
                                                         <span className="text-muted-foreground">
                                                             ({alt.similarity}%)
                                                         </span>
