@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useAppStore, type ApiKey } from "@/lib/store";
 import { Badge } from "@/components/ui/badge";
 import { getModelsByProvider, type ExtendedModelInfo } from "@/lib/models";
+import { testConnectionClientSide, fetchProviderModelsClientSide } from "@/lib/ai-pipeline";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -101,33 +102,36 @@ export default function SettingsPage() {
     try {
       setLoadingModels(true);
       setError(null);
-      
+
       const apiKey = getApiKeyForProvider(providerId);
-      
+
       if (apiKey) {
-        const response = await fetch(
-          `/api/provider-models?provider=${providerId}&apiKey=${encodeURIComponent(apiKey)}`
-        );
-        
-        if (response.ok) {
-          const data = await response.json();
-          setModels(data.models || []);
-          if (data.models?.length > 0) {
+        try {
+          const providerModels = await fetchProviderModelsClientSide(providerId, apiKey);
+          if (providerModels.length > 0) {
+            const extendedModels: ExtendedModelInfo[] = providerModels.map(m => ({
+              id: m.id,
+              name: m.name,
+              provider: providerId,
+              providerName: providerId,
+            }));
+            setModels(extendedModels);
             return;
           }
+        } catch {
+          // Fall through to registry fallback
         }
       }
-      
+
       const modelList = await getModelsByProvider(providerId);
       setModels(modelList);
-      
+
       if (modelList.length === 0) {
         setError("No models found. Please add an API key to fetch the latest models.");
       } else if (!apiKey) {
         setError("Using cached model list. Add an API key to fetch the latest models.");
       }
     } catch (err) {
-      console.error("Error loading models:", err);
       setError(err instanceof Error ? err.message : "Failed to load models");
       setModels([]);
     } finally {
@@ -137,36 +141,38 @@ export default function SettingsPage() {
 
   async function fetchModelsFromEndpoint(baseURL: string) {
     if (!baseURL) return;
-    
+
     try {
       setFetchingModels(true);
       setError(null);
-      
+
       const apiKey = getApiKeyForProvider(provider || "");
-      const response = await fetch(
-        `/api/local-models?baseURL=${encodeURIComponent(baseURL)}${apiKey ? `&apiKey=${encodeURIComponent(apiKey)}` : ''}`
-      );
-      
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || "Failed to fetch models");
+      const modelsURL = `${baseURL.replace(/\/+$/, "")}/models`;
+      const headers: Record<string, string> = {};
+      if (apiKey) {
+        headers["Authorization"] = `Bearer ${apiKey}`;
       }
-      
+
+      const response = await fetch(modelsURL, { headers });
+      if (!response.ok) {
+        throw new Error(`Failed to fetch models: ${response.status}`);
+      }
+
       const data = await response.json();
-      const fetchedModels: ExtendedModelInfo[] = (data.models || []).map((m: { id: string; name: string }) => ({
+      const modelList = data.data || [];
+      const fetchedModels: ExtendedModelInfo[] = modelList.map((m: { id: string; name?: string }) => ({
         id: m.id,
-        name: m.name,
+        name: m.name || m.id,
         provider: provider || "custom",
         providerName: customLabel || "Custom",
       }));
-      
+
       setModels(fetchedModels);
-      
+
       if (fetchedModels.length === 0) {
         setError("No models found at this endpoint. You can enter the model ID manually.");
       }
     } catch (err) {
-      console.error("Error fetching models:", err);
       setError(err instanceof Error ? err.message : "Failed to fetch models. You can enter the model ID manually.");
       setModels([]);
     } finally {
@@ -240,28 +246,19 @@ export default function SettingsPage() {
     const testApiKey = getApiKeyForProvider(provider || "");
     const effectiveModelId = modelId;
     const effectiveBaseURL = group === 'openai-compatible' ? customBaseURL : undefined;
-    
+
     if (!effectiveModelId) {
-      setTestResult({
-        success: false,
-        message: "Please enter a model ID",
-      });
+      setTestResult({ success: false, message: "Please enter a model ID" });
       return;
     }
-    
+
     if (group === 'openai-compatible' && !customBaseURL) {
-      setTestResult({
-        success: false,
-        message: "Please enter a Base URL",
-      });
+      setTestResult({ success: false, message: "Please enter a Base URL" });
       return;
     }
-    
+
     if (!testApiKey && group === 'cloud') {
-      setTestResult({
-        success: false,
-        message: "Please add an API key for this provider",
-      });
+      setTestResult({ success: false, message: "Please add an API key for this provider" });
       return;
     }
 
@@ -269,38 +266,21 @@ export default function SettingsPage() {
       setTesting(true);
       setTestResult(null);
 
-      const effectiveProvider = group === 'openai-compatible' 
+      const effectiveProvider = group === 'openai-compatible'
         ? (customLabel?.toLowerCase().replace(/\s+/g, '-') || 'openai-compatible')
         : provider;
 
-      const response = await fetch("/api/test-connection", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          modelId: effectiveModelId,
-          provider: effectiveProvider,
-          apiKey: testApiKey,
-          apiKeys: apiKeys.filter((k) => k.provider === provider),
-          baseURL: effectiveBaseURL,
-        }),
+      const result = await testConnectionClientSide({
+        modelId: effectiveModelId,
+        provider: effectiveProvider || "",
+        apiKey: testApiKey || "",
+        baseURL: effectiveBaseURL,
       });
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || "Connection test failed");
-      }
-
-      setTestResult({
-        success: true,
-        message: "Connection successful! Your configuration is working correctly.",
-      });
+      setTestResult(result);
     } catch (err) {
-      console.error("Test connection failed:", err);
       let errorMessage = "Connection failed. Please check your configuration.";
-      
+
       if (err instanceof Error) {
         errorMessage = err.message;
         if (err.message.includes("not found")) {
@@ -316,10 +296,7 @@ export default function SettingsPage() {
         }
       }
 
-      setTestResult({
-        success: false,
-        message: errorMessage,
-      });
+      setTestResult({ success: false, message: errorMessage });
     } finally {
       setTesting(false);
     }

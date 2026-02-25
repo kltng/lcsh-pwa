@@ -65,11 +65,6 @@ let cacheTimestamp: number = 0;
  * Check if models.dev should be used
  */
 export function shouldUseModelsDev(): boolean {
-  if (typeof window === "undefined") {
-    // Server-side: check env var
-    return process.env.USE_MODELS_DEV === "true";
-  }
-  // Client-side: default to true (can be overridden by API)
   return true;
 }
 
@@ -77,28 +72,11 @@ export function shouldUseModelsDev(): boolean {
  * Fetch models.dev API data
  */
 export async function fetchModelsDev(): Promise<ModelsDevResponse> {
-  if (typeof window === "undefined") {
-    // Server-side: direct fetch
-    const response = await fetch("https://models.dev/api.json", {
-      next: { revalidate: 3600 },
-    });
-    if (!response.ok) {
-      throw new Error(`Failed to fetch models.dev: ${response.status}`);
-    }
-    return await response.json();
-  } else {
-    // Client-side: use API route to avoid CORS
-    const response = await fetch("/api/models");
-    if (!response.ok) {
-      throw new Error(`Failed to fetch models.dev: ${response.status}`);
-    }
-    const data = await response.json();
-    // If empty object, models.dev is disabled
-    if (Object.keys(data).length === 0) {
-      throw new Error("models.dev is disabled");
-    }
-    return data;
+  const response = await fetch("https://models.dev/api.json");
+  if (!response.ok) {
+    throw new Error(`Failed to fetch models.dev: ${response.status}`);
   }
+  return await response.json();
 }
 
 /**
@@ -112,9 +90,6 @@ export async function getProviders(): Promise<ExtendedProviderInfo[]> {
 
   // Check feature flag
   if (!shouldUseModelsDev()) {
-    console.log(
-      "models.dev disabled via USE_MODELS_DEV, using local registry"
-    );
     const localProviders = LOCAL_PROVIDERS.map((p) => ({
       ...p,
       apiKeyEnv: p.apiKeyEnv,
@@ -147,12 +122,8 @@ export async function getProviders(): Promise<ExtendedProviderInfo[]> {
     cachedProviders = providers;
     cacheTimestamp = now;
     return providers;
-  } catch (error) {
+  } catch {
     // Fallback to local registry
-    console.warn(
-      "Failed to fetch from models.dev, using local registry:",
-      error
-    );
     const localProviders = LOCAL_PROVIDERS.map((p) => ({
       ...p,
       apiKeyEnv: p.apiKeyEnv,
@@ -174,9 +145,6 @@ export async function getAllModels(): Promise<ExtendedModelInfo[]> {
 
   // Check feature flag
   if (!shouldUseModelsDev()) {
-    console.log(
-      "models.dev disabled via USE_MODELS_DEV, using local registry"
-    );
     const localModels = LOCAL_MODELS.map((m) => ({
       ...m,
     }));
@@ -224,12 +192,8 @@ export async function getAllModels(): Promise<ExtendedModelInfo[]> {
     cachedModels = models;
     cacheTimestamp = now;
     return models;
-  } catch (error) {
+  } catch {
     // Fallback to local registry
-    console.warn(
-      "Failed to fetch from models.dev, using local registry:",
-      error
-    );
     const localModels = LOCAL_MODELS.map((m) => ({
       ...m,
     }));

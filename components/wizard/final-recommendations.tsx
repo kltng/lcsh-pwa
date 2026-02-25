@@ -3,7 +3,8 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAppStore } from "@/lib/store";
-import { generateMarcRecords, parseMarcRecords } from "@/lib/ai";
+import { parseMarcRecords } from "@/lib/ai";
+import { generateMarcClientSide } from "@/lib/ai-pipeline";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -77,12 +78,11 @@ export function FinalRecommendations() {
 
     try {
       setProcessingMarc(true);
-      const result = await generateMarcRecords({
+      const result = await generateMarcClientSide({
         modelId,
+        provider: provider!,
         apiKey: effectiveApiKey,
-        apiKeys,
         recommendations: highScoring,
-        provider,
       });
 
       const terms = highScoring.map((r) => r.term);
