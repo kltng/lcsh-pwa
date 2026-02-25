@@ -15,6 +15,7 @@ export function FinalRecommendations() {
   const router = useRouter();
   const {
     bibliographicInfo,
+    subjectAnalysis,
     finalRecommendations,
     marcRecords,
     setActiveStep,
@@ -35,6 +36,7 @@ export function FinalRecommendations() {
   );
   const [averageSimilarity, setAverageSimilarity] = useState(0);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
+  const [copiedAll, setCopiedAll] = useState(false);
   const [processingMarc, setProcessingMarc] = useState(false);
 
   useEffect(() => {
@@ -99,13 +101,33 @@ export function FinalRecommendations() {
     setTimeout(() => setCopiedIndex(null), 2000);
   }
 
+  function handleCopyAllMARC() {
+    const allMarc = sortedRecommendations
+      .filter((rec) => rec.similarity && rec.similarity > 30 && rec.bestMatch)
+      .map((rec) => rec.marc || marcRecords?.[rec.term] || "")
+      .filter(Boolean)
+      .join("\n");
+    if (allMarc) {
+      navigator.clipboard.writeText(allMarc);
+      setCopiedAll(true);
+      setTimeout(() => setCopiedAll(false), 2000);
+    }
+  }
+
   function handleSaveAndViewHistory() {
     try {
+      // Merge MARC records into each recommendation before saving
+      const recsWithMarc = finalRecommendations?.map(rec => ({
+        ...rec,
+        marc: rec.marc || marcRecords?.[rec.term] || "",
+      }));
+
       addConversation({
         bibliographicInfo,
+        subjectAnalysis: subjectAnalysis || undefined,
         initialSuggestions: undefined,
         validationResults: undefined,
-        finalRecommendations: finalRecommendations || undefined,
+        finalRecommendations: recsWithMarc || undefined,
         marcRecords: marcRecords || undefined,
       });
 
@@ -121,24 +143,38 @@ export function FinalRecommendations() {
   function handleExportCSV() {
     if (!finalRecommendations) return;
 
-    const csv = [
-      ["Term", "Similarity", "Best Match", "AI Reasoning", "MARC"],
-      ...finalRecommendations.map((rec) => [
-        rec.term,
-        `${rec.similarity}%`,
-        rec.bestMatch?.heading || "",
-        rec.justification || "",
-        rec.marc || marcRecords?.[rec.term] || "",
-      ]),
-    ]
-      .map((row) => row.map((cell) => `"${cell}"`).join(","))
-      .join("\n");
+    const escCsv = (s: string) => `"${s.replace(/"/g, '""')}"`;
+    const title = bibliographicInfo.title || "Untitled";
 
+    const rows = [
+      ["Suggested Term", "Best Match", "Source", "Similarity", "URI", "AI Reasoning", "MARC"].map(escCsv).join(","),
+      ...finalRecommendations.map((rec) =>
+        [
+          rec.term,
+          rec.bestMatch?.heading || "",
+          (rec.source || "lcsh").toUpperCase(),
+          `${rec.similarity}%`,
+          rec.bestMatch?.uri || "",
+          rec.justification || "",
+          rec.marc || marcRecords?.[rec.term] || "",
+        ].map(escCsv).join(",")
+      ),
+    ];
+
+    // Prepend bibliographic info and subject analysis as header rows
+    const header = [
+      `# Title: ${escCsv(title)}`,
+      `# Author: ${escCsv(bibliographicInfo.author || "N/A")}`,
+      ...(subjectAnalysis ? [`# Subject Analysis: ${escCsv(subjectAnalysis)}`] : []),
+      "",
+    ];
+
+    const csv = [...header, ...rows].join("\n");
     const blob = new Blob([csv], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `lcsh-recommendations-${Date.now()}.csv`;
+    a.download = `lcsh-${title.replace(/[^a-zA-Z0-9]/g, "_").substring(0, 40)}-${Date.now()}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   }
@@ -175,6 +211,17 @@ export function FinalRecommendations() {
         </Alert>
       )}
 
+      {subjectAnalysis && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Subject Analysis</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground">{subjectAnalysis}</p>
+          </CardContent>
+        </Card>
+      )}
+
       <Card>
         <CardHeader>
           <CardTitle>Overall Validation Score</CardTitle>
@@ -202,14 +249,21 @@ export function FinalRecommendations() {
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-lg">{rec.term}</CardTitle>
-                  <Badge
-                    style={{
-                      backgroundColor: getSimilarityColor(rec.similarity || 0),
-                      color: "white",
-                    }}
-                  >
-                    {rec.similarity}% - {getSimilarityLabel(rec.similarity || 0)}
-                  </Badge>
+                  <div className="flex items-center gap-2">
+                    {rec.source && (
+                      <Badge variant="secondary" className="text-xs">
+                        {rec.source.toUpperCase()}
+                      </Badge>
+                    )}
+                    <Badge
+                      style={{
+                        backgroundColor: getSimilarityColor(rec.similarity || 0),
+                        color: "white",
+                      }}
+                    >
+                      {rec.similarity}% - {getSimilarityLabel(rec.similarity || 0)}
+                    </Badge>
+                  </div>
                 </div>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -240,7 +294,7 @@ export function FinalRecommendations() {
                 {marc && (
                   <div>
                     <div className="flex items-center justify-between mb-2">
-                      <strong>MARC Record (650):</strong>
+                      <strong>MARC Record ({rec.source === "lcnaf" ? (marc.startsWith("610") ? "610" : "600") : "650"}):</strong>
                       <Button
                         variant="outline"
                         size="sm"
@@ -277,11 +331,24 @@ export function FinalRecommendations() {
         })}
       </div>
 
-      <div className="flex justify-between items-center">
+      <div className="flex flex-wrap justify-between items-center gap-2">
         <Button variant="outline" onClick={() => setActiveStep(1)}>
           Back
         </Button>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" onClick={handleCopyAllMARC} disabled={processingMarc}>
+            {copiedAll ? (
+              <>
+                <CheckCircle2 className="mr-2 h-4 w-4" />
+                Copied!
+              </>
+            ) : (
+              <>
+                <Copy className="mr-2 h-4 w-4" />
+                Copy All MARC
+              </>
+            )}
+          </Button>
           <Button variant="outline" onClick={handleExportCSV}>
             Export CSV
           </Button>

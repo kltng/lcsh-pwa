@@ -12,6 +12,23 @@ export interface SearchOptions {
 }
 
 /**
+ * Normalizes a query by stripping spaces around "--" delimiters.
+ * e.g., "English fiction -- 19th century" → "English fiction--19th century"
+ */
+export function normalizeQuery(query: string): string {
+    return query.replace(/\s*--\s*/g, "--");
+}
+
+/**
+ * Extracts the main heading (text before the first "--" delimiter).
+ * e.g., "English fiction--19th century" → "English fiction"
+ */
+export function extractMainHeading(query: string): string {
+    const idx = query.indexOf("--");
+    return idx >= 0 ? query.substring(0, idx).trim() : query.trim();
+}
+
+/**
  * Robustly parses the response from LOC Suggest2 API.
  * Handles both the new 'hits' dictionary format and the legacy list-based format.
  */
@@ -85,20 +102,26 @@ export async function searchLcsh(query: string, options: SearchOptions = {}): Pr
     try {
         // Add timeout to prevent hanging requests
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+        const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout (increased)
 
-        const response = await fetch(`${url}?${params.toString()}`, {
+        const fullUrl = `${url}?${params.toString()}`;
+        console.log(`Fetching LCSH from: ${fullUrl}`);
+
+        const response = await fetch(fullUrl, {
             headers: {
                 "User-Agent": "cataloging-assistant/1.0",
+                "Accept": "application/json",
             },
-            next: { revalidate: 3600 },
             signal: controller.signal,
+            // Remove 'next' option for server-side fetch - it's only for Next.js route handlers
         });
 
         clearTimeout(timeoutId);
 
         if (!response.ok) {
+            const errorText = await response.text().catch(() => '');
             console.error(`LOC API returned ${response.status}: ${response.statusText} for query: ${query}`);
+            console.error(`Response body: ${errorText.substring(0, 200)}`);
             throw new Error(`LOC API returned ${response.status}: ${response.statusText}`);
         }
 
@@ -108,6 +131,11 @@ export async function searchLcsh(query: string, options: SearchOptions = {}): Pr
         return results;
     } catch (error) {
         console.error("Error searching LCSH:", error);
+        console.error("Error details:", {
+            name: error instanceof Error ? error.name : 'Unknown',
+            message: error instanceof Error ? error.message : String(error),
+            stack: error instanceof Error ? error.stack : undefined,
+        });
         // If it's a timeout, DNS error, or network error, return empty array instead of throwing
         if (error instanceof Error && (
             error.name === 'AbortError' || 
@@ -115,7 +143,9 @@ export async function searchLcsh(query: string, options: SearchOptions = {}): Pr
             error.message.includes('ETIMEDOUT') ||
             error.message.includes('ENOTFOUND') ||
             error.message.includes('getaddrinfo') ||
-            error.message.includes('Could not resolve host')
+            error.message.includes('Could not resolve host') ||
+            error.message.includes('network') ||
+            error.message.includes('ECONNREFUSED')
         )) {
             console.warn(`LCSH search failed for "${query}" (timeout/network/DNS error), returning empty results`);
             return [];
@@ -128,32 +158,45 @@ export async function searchLcsh(query: string, options: SearchOptions = {}): Pr
  * Searches the Library of Congress Name Authority File (LCNAF).
  */
 export async function searchLcnaf(query: string, options: SearchOptions = {}): Promise<LcshResult[]> {
-    const { count = 25, rdftype = "PersonalName" } = options;
+    const { count = 25, rdftype, searchType = "left-anchored" } = options;
 
     const url = "https://id.loc.gov/authorities/names/suggest2";
     const params = new URLSearchParams({
         q: query,
-        rdftype: rdftype,
         count: count.toString(),
     });
+
+    if (rdftype) {
+        params.append("rdftype", rdftype);
+    }
+
+    if (searchType === "keyword") {
+        params.append("searchtype", "keyword");
+    }
 
     try {
         // Add timeout to prevent hanging requests
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+        const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout (increased)
 
-        const response = await fetch(`${url}?${params.toString()}`, {
+        const fullUrl = `${url}?${params.toString()}`;
+        console.log(`Fetching LCNAF from: ${fullUrl}`);
+
+        const response = await fetch(fullUrl, {
             headers: {
                 "User-Agent": "cataloging-assistant/1.0",
+                "Accept": "application/json",
             },
-            next: { revalidate: 3600 },
             signal: controller.signal,
+            // Remove 'next' option for server-side fetch - it's only for Next.js route handlers
         });
 
         clearTimeout(timeoutId);
 
         if (!response.ok) {
+            const errorText = await response.text().catch(() => '');
             console.error(`LCNAF API returned ${response.status}: ${response.statusText} for query: ${query}`);
+            console.error(`Response body: ${errorText.substring(0, 200)}`);
             throw new Error(`LOC API returned ${response.status}: ${response.statusText}`);
         }
 
@@ -163,6 +206,11 @@ export async function searchLcnaf(query: string, options: SearchOptions = {}): P
         return results;
     } catch (error) {
         console.error("Error searching LCNAF:", error);
+        console.error("Error details:", {
+            name: error instanceof Error ? error.name : 'Unknown',
+            message: error instanceof Error ? error.message : String(error),
+            stack: error instanceof Error ? error.stack : undefined,
+        });
         // If it's a timeout, DNS error, or network error, return empty array instead of throwing
         if (error instanceof Error && (
             error.name === 'AbortError' || 
@@ -170,7 +218,9 @@ export async function searchLcnaf(query: string, options: SearchOptions = {}): P
             error.message.includes('ETIMEDOUT') ||
             error.message.includes('ENOTFOUND') ||
             error.message.includes('getaddrinfo') ||
-            error.message.includes('Could not resolve host')
+            error.message.includes('Could not resolve host') ||
+            error.message.includes('network') ||
+            error.message.includes('ECONNREFUSED')
         )) {
             console.warn(`LCNAF search failed for "${query}" (timeout/network/DNS error), returning empty results`);
             return [];
