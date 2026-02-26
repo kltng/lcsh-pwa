@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Sparkles, Settings, History, Home } from "lucide-react";
+import { Sparkles, Settings, History, Home, BookOpen } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export function Navigation() {
@@ -13,6 +13,7 @@ export function Navigation() {
     { href: "/", label: "Home", icon: Home },
     { href: "/wizard", label: "Wizard", icon: Sparkles },
     { href: "/history", label: "History", icon: History },
+    { href: "/tutorial", label: "Tutorial", icon: BookOpen },
     { href: "/settings", label: "Settings", icon: Settings },
   ];
 
