@@ -1,93 +1,131 @@
-# Cataloging Assistant
+# LCSH Cataloging Assistant
 
-A Progressive Web App (PWA) built with [Next.js](https://nextjs.org), [TypeScript](https://www.typescriptlang.org/), and [shadcn/ui](https://ui.shadcn.com/).
+A Progressive Web App that combines AI-powered subject analysis with real-time Library of Congress validation to produce accurate LCSH headings and MARC records. All processing runs client-side — no data ever leaves your browser.
+
+Part of the [LCSH Tools](https://lcsh.098484.xyz) ecosystem. The concepts behind this tool are described in [Tang & Jiang (2025)](https://arxiv.org/abs/2508.00867).
 
 ## Features
 
-- ⚡ Next.js 16 with App Router
-- 🎨 shadcn/ui components
-- 📱 Progressive Web App (PWA) support
-- 🔷 TypeScript
-- 🎯 Tailwind CSS
-- ⚙️ ESLint configured
+- **AI-Powered Suggestions** — Configurable AI models analyze bibliographic information and suggest appropriate subject headings with detailed reasoning
+- **Dual Authority Validation** — Every suggestion is validated in real time against both LCSH (subjects) and LCNAF (names) via the Library of Congress suggest2 API
+- **MARC Record Generation** — Generates properly formatted MARC records with correct tags (650, 600, 610), indicators, and subfields
+- **Image Analysis** — Upload book covers or title pages for vision-capable AI models to extract additional subject information
+- **Multi-Provider AI** — Bring your own API key from OpenAI, Google Gemini, DeepSeek, Qwen, Together AI, Groq, Perplexity, OpenRouter, or any OpenAI-compatible endpoint
+- **Similarity Scoring** — Levenshtein distance-based scoring with color-coded percentages (0–100%) shows match quality at a glance
+- **History & Export** — Save sessions to browser storage, review past recommendations, export CSV, and copy MARC records
+- **Offline PWA** — Install on any device and works offline after initial setup
+- **Zero-Knowledge Architecture** — All data stays in your browser; API keys are stored locally and masked in the UI
+
+## How It Works
+
+1. **Enter bibliographic info** — Title, author, abstract, table of contents, notes, and optionally images
+2. **AI suggests & validates** — AI analyzes your input, generates LCSH/LCNAF candidates, and validates each one against the Library of Congress in real time
+3. **Export MARC records** — Review validated headings with similarity scores, then copy MARC records or export as CSV
 
 ## Getting Started
 
-First, install dependencies:
+### Prerequisites
+
+- [Node.js](https://nodejs.org/) 18+
+- [pnpm](https://pnpm.io/)
+
+### Installation
 
 ```bash
-npm install
+pnpm install
 ```
 
-Then, run the development server:
+### Development
 
 ```bash
-npm run dev
+pnpm dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000) in your browser.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+> PWA features (service worker, offline support) are disabled in development mode.
 
-## PWA Configuration
-
-This project is configured as a Progressive Web App with:
-
-- Service Worker (via `next-pwa`)
-- Web App Manifest (`public/manifest.json`)
-- Offline support
-- Installable on mobile and desktop
-
-**Note:** PWA features are disabled in development mode. To test PWA functionality, build and run the production server:
+### Production Build
 
 ```bash
-npm run build
-npm start
+pnpm build
+pnpm start
 ```
 
-### PWA Icons
+## Configuration
 
-The manifest references icon files that need to be added:
-- `public/icon-192x192.png` (192x192 pixels)
-- `public/icon-512x512.png` (512x512 pixels)
+All configuration happens in the browser through the Settings page. No server-side environment variables are required.
 
-You can generate these icons using tools like:
-- [PWA Asset Generator](https://github.com/onderceylan/pwa-asset-generator)
-- [RealFaviconGenerator](https://realfavicongenerator.net/)
+| Setting | Description |
+|---------|-------------|
+| **Provider** | AI provider (OpenAI, Google, DeepSeek, Qwen, Together AI, Groq, Perplexity, OpenRouter) |
+| **API Key** | Your API key for the selected provider — stored in browser localStorage only |
+| **Model** | Model to use for inference — fetched dynamically from [models.dev](https://models.dev) with 24-hour caching |
+| **Custom Endpoint** | Optional base URL for OpenAI-compatible APIs (Ollama, LM Studio, vLLM, etc.) |
+| **System Prompt** | Customizable rules for LCSH selection (13 default rules covering topic selection, specificity, heading counts, etc.) |
 
-## Adding shadcn/ui Components
+## Supported AI Providers
 
-To add shadcn/ui components to your project:
-
-```bash
-npx shadcn@latest add [component-name]
-```
-
-For example:
-```bash
-npx shadcn@latest add button
-npx shadcn@latest add card
-```
-
-See the [shadcn/ui documentation](https://ui.shadcn.com/docs/components) for available components.
+| Provider | Example Models |
+|----------|----------------|
+| OpenAI | GPT-4o, GPT-4 Turbo, o1-preview |
+| Google Gemini | Gemini 2.5 Flash, Gemini 2.5 Pro, Gemini 2.0 Flash |
+| DeepSeek | DeepSeek Chat, DeepSeek Reasoner (R1) |
+| Qwen | Qwen Turbo, Qwen Plus, Qwen Max |
+| Together AI | Llama, Mixtral |
+| Groq | Llama 3 70B, Mixtral 8x7B |
+| Perplexity | Perplexity models |
+| OpenRouter | Access to multiple model providers |
+| Custom Endpoint | Any OpenAI-compatible API |
 
 ## Project Structure
 
 ```
-cataloging-assistant/
-├── app/              # Next.js App Router pages
-├── components/       # React components (add shadcn components here)
-├── lib/              # Utility functions
-├── public/           # Static assets and PWA files
-└── ...
+lcsh-pwa/
+├── app/
+│   ├── page.tsx              # Home page
+│   ├── layout.tsx            # Root layout with navigation
+│   ├── wizard/               # 3-step cataloging wizard
+│   ├── history/              # Session history with detail view
+│   ├── settings/             # Provider, API key, and model configuration
+│   └── tutorial/             # Step-by-step usage guide with screenshots
+├── components/
+│   ├── navigation.tsx        # Sidebar navigation
+│   ├── first-visit-dialog.tsx
+│   ├── ui/                   # shadcn/ui components
+│   └── wizard/               # Wizard step components
+├── lib/
+│   ├── ai-pipeline.ts        # AI suggestion + validation + MARC generation pipeline
+│   ├── ai.ts                 # Client-side AI helpers, MARC parsing
+│   ├── lcsh.ts               # LOC API wrappers (searchLcsh, searchLcnaf)
+│   ├── similarity.ts         # Levenshtein distance + similarity scoring
+│   ├── store.ts              # Zustand store (settings, wizard state, history)
+│   ├── model-registry.ts     # Provider registry with fallback models
+│   ├── models.ts             # Dynamic model fetching from models.dev
+│   └── provider-groups.ts    # Provider grouping and metadata
+└── public/
+    ├── manifest.json          # PWA manifest
+    ├── sw.js                  # Service worker (generated)
+    └── screenshots/           # Tutorial screenshots
 ```
 
-## Learn More
+## Tech Stack
 
-- [Next.js Documentation](https://nextjs.org/docs)
-- [shadcn/ui Documentation](https://ui.shadcn.com)
-- [PWA Documentation](https://web.dev/progressive-web-apps/)
+- [Next.js](https://nextjs.org/) 16 (App Router, webpack mode)
+- [React](https://react.dev/) 19
+- [TypeScript](https://www.typescriptlang.org/) 5
+- [Tailwind CSS](https://tailwindcss.com/) 4
+- [shadcn/ui](https://ui.shadcn.com/) + [Radix UI](https://www.radix-ui.com/)
+- [Zustand](https://zustand.docs.pmnd.rs/) — State management with localStorage persistence
+- [Vercel AI SDK](https://sdk.vercel.ai/) — `generateObject` / `generateText` with multi-provider support
+- [Zod](https://zod.dev/) — Structured output schemas
+- [next-pwa](https://github.com/shadowwalker/next-pwa) — Service worker and offline support
+- [idb](https://github.com/nicoritschel/idb-keyval) — IndexedDB wrapper for browser storage
 
-## Deploy on Vercel
+## Acknowledgments
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme).
+Built on the [LC Linked Data Service](https://id.loc.gov/), which provides machine-readable access to the Library of Congress's authority files including Subject Headings (LCSH) and Name Authorities (LCNAF).
+
+## License
+
+All rights reserved.
