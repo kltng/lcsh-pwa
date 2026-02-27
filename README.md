@@ -2,7 +2,7 @@
 
 A Progressive Web App that combines AI-powered subject analysis with real-time Library of Congress validation to produce accurate LCSH headings and MARC records. All processing runs client-side — no data ever leaves your browser.
 
-Part of the [LCSH Tools](https://lcsh.098484.xyz) ecosystem. The concepts behind this tool are described in [Tang & Jiang (2025)](https://arxiv.org/abs/2508.00867).
+Part of the [LCSH Tools](https://www.cataloguer.name) ecosystem. The concepts behind this tool are described in [Tang & Jiang (2025)](https://arxiv.org/abs/2508.00867).
 
 ## Features
 

@@ -34,6 +34,7 @@ export const CLOUD_PROVIDERS: ProviderWithGroup[] = [
   { id: 'zhipu', name: 'Z.ai (智谱)', group: 'cloud', hardcodedBaseURL: 'https://open.bigmodel.cn/api/paas/v4' },
   { id: 'moonshot', name: 'Kimi (月之暗面)', group: 'cloud', hardcodedBaseURL: 'https://api.moonshot.cn/v1' },
   { id: 'minimax', name: 'Minimax', group: 'cloud', hardcodedBaseURL: 'https://api.minimax.chat/v1' },
+  { id: 'openrouter', name: 'OpenRouter', group: 'cloud', hardcodedBaseURL: 'https://openrouter.ai/api/v1' },
 ];
 
 // Group configuration - defines fields and behavior for each group

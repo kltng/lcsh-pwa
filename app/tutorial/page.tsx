@@ -127,10 +127,10 @@ export default function TutorialPage() {
           <p className="text-muted-foreground mb-4">
             Open your web browser and navigate to{" "}
             <a
-              href="https://cataloging.098484.xyz"
+              href="https://assistant.cataloguer.name"
               className="text-primary underline"
             >
-              cataloging.098484.xyz
+              assistant.cataloguer.name
             </a>
             . The app works best in modern browsers (Chrome, Firefox, Safari,
             Edge).
