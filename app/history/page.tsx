@@ -170,11 +170,11 @@ export default function HistoryPage() {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-[120px]">Actions</TableHead>
                   <TableHead className="w-[140px]">Date</TableHead>
                   <TableHead className="min-w-[150px]">Title</TableHead>
                   <TableHead className="hidden md:table-cell min-w-[120px]">Author</TableHead>
-                  <TableHead className="w-[100px]">Terms</TableHead>
-                  <TableHead className="w-[120px] text-right">Actions</TableHead>
+                  <TableHead className="w-[80px]">Terms</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -182,30 +182,8 @@ export default function HistoryPage() {
                   .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
                   .map((conversation) => (
                     <TableRow key={conversation.id}>
-                      <TableCell className="whitespace-nowrap">
-                        <div className="flex items-center gap-2">
-                          <Calendar className="h-4 w-4 text-muted-foreground shrink-0" />
-                          <span>{new Date(conversation.timestamp).toLocaleDateString()}</span>
-                        </div>
-                        <div className="text-xs text-muted-foreground ml-6">
-                          {new Date(conversation.timestamp).toLocaleTimeString()}
-                        </div>
-                      </TableCell>
                       <TableCell>
-                        <span className="font-medium line-clamp-2">
-                          {conversation.bibliographicInfo.title || "Untitled"}
-                        </span>
-                      </TableCell>
-                      <TableCell className="hidden md:table-cell">
-                        <span className="line-clamp-1">
-                          {conversation.bibliographicInfo.author || "N/A"}
-                        </span>
-                      </TableCell>
-                      <TableCell>
-                        {conversation.finalRecommendations?.length || 0}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-1">
+                        <div className="flex gap-1">
                           <Button
                             variant="ghost"
                             size="icon"
@@ -234,6 +212,28 @@ export default function HistoryPage() {
                             <Trash2 className="h-4 w-4" />
                           </Button>
                         </div>
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap">
+                        <div className="flex items-center gap-2">
+                          <Calendar className="h-4 w-4 text-muted-foreground shrink-0" />
+                          <span>{new Date(conversation.timestamp).toLocaleDateString()}</span>
+                        </div>
+                        <div className="text-xs text-muted-foreground ml-6">
+                          {new Date(conversation.timestamp).toLocaleTimeString()}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <span className="font-medium line-clamp-2">
+                          {conversation.bibliographicInfo.title || "Untitled"}
+                        </span>
+                      </TableCell>
+                      <TableCell className="hidden md:table-cell">
+                        <span className="line-clamp-1">
+                          {conversation.bibliographicInfo.author || "N/A"}
+                        </span>
+                      </TableCell>
+                      <TableCell>
+                        {conversation.finalRecommendations?.length || 0}
                       </TableCell>
                     </TableRow>
                   ))}
