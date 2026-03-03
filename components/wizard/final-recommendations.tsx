@@ -26,6 +26,7 @@ export function FinalRecommendations() {
     apiKey,
     apiKeys,
     getApiKeyForProvider,
+    getBaseURLForProvider,
     modelId,
     provider, // Get provider from store to pass to API
     error,
@@ -68,7 +69,8 @@ export function FinalRecommendations() {
     if (!modelId || !provider) return;
 
     const effectiveApiKey = getApiKeyForProvider(provider);
-    if (!effectiveApiKey) return;
+    const baseURL = getBaseURLForProvider(provider);
+    if (!effectiveApiKey && !baseURL) return;
 
     const highScoring = recommendations.filter(
       (rec) => rec.similarity && rec.similarity > 30 && rec.bestMatch
@@ -81,7 +83,8 @@ export function FinalRecommendations() {
       const result = await generateMarcClientSide({
         modelId,
         provider: provider!,
-        apiKey: effectiveApiKey,
+        apiKey: effectiveApiKey || "",
+        baseURL,
         recommendations: highScoring,
       });
 

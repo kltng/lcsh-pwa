@@ -26,6 +26,7 @@ export function BibliographicForm({ onValidatedTerms }: BibliographicFormProps) 
     modelId,
     provider, // Get provider from store to pass to API
     getApiKeyForProvider,
+    getBaseURLForProvider,
     setActiveStep,
     setIsLoading,
     isLoading,
@@ -127,7 +128,8 @@ export function BibliographicForm({ onValidatedTerms }: BibliographicFormProps) 
 
     // Check for API key (either from apiKeys array or deprecated apiKey)
     const hasApiKey = getApiKeyForProvider(provider) || apiKey;
-    if (!hasApiKey) {
+    const hasBaseURL = getBaseURLForProvider(provider);
+    if (!hasApiKey && !hasBaseURL) {
       setError("Please add an API key for this provider in Settings");
       return false;
     }
@@ -158,14 +160,16 @@ export function BibliographicForm({ onValidatedTerms }: BibliographicFormProps) 
 
       // Run AI + LOC validation entirely client-side (zero-knowledge)
       const effectiveApiKey = getApiKeyForProvider(provider!) || apiKey;
-      if (!effectiveApiKey) {
+      const baseURL = getBaseURLForProvider(provider!);
+      if (!effectiveApiKey && !baseURL) {
         throw new Error("No API key found for this provider");
       }
 
       const data = await generateSuggestionsClientSide({
         modelId: modelId!,
         provider: provider!,
-        apiKey: effectiveApiKey,
+        apiKey: effectiveApiKey || "",
+        baseURL,
         bibliographicInfo: enhancedBibliographicInfo,
         systemPromptRules: systemPromptRules || "",
       });
