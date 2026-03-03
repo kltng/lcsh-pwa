@@ -87,20 +87,45 @@ function normalizeConfidence(confidence: number): number {
  */
 async function searchLOCForTerm(suggested: string): Promise<{ lcshResults: TaggedLcshResult[]; lcnafResults: TaggedLcshResult[] }> {
   const normalized = normalizeQuery(suggested);
+  const mainHeading = extractMainHeading(normalized);
+  const hasSubdivisions = normalized.includes("--");
 
-  const [lcshRaw, lcnafRaw] = await Promise.all([
-    searchLcsh(normalized, { count: 20, searchType: "keyword" }),
-    searchLcnaf(normalized, { count: 20, searchType: "keyword" }),
-  ]);
+  // Always search with the main heading (keyword) — this reliably returns results
+  // even when the full compound term (with subdivisions) returns nothing.
+  const searches: Promise<LcshResult[]>[] = [
+    searchLcsh(mainHeading, { count: 20, searchType: "keyword" }),
+    searchLcnaf(mainHeading, { count: 20, searchType: "keyword" }),
+  ];
 
-  let lcshResults: TaggedLcshResult[] = lcshRaw.map(r => ({ ...r, source: "lcsh" as const }));
-  const lcnafResults: TaggedLcshResult[] = lcnafRaw.map(r => ({ ...r, source: "lcnaf" as const }));
+  // If term has subdivisions, also do a left-anchored search with the full term
+  // to catch exact compound matches like "Civil service--Brazil"
+  if (hasSubdivisions) {
+    searches.push(searchLcsh(normalized, { count: 20, searchType: "left-anchored" }));
+    searches.push(searchLcnaf(normalized, { count: 20, searchType: "left-anchored" }));
+  }
 
-  // Fallback: if LCSH returns 0 and query has "--", search with just main heading
-  if (lcshResults.length === 0 && normalized.includes("--")) {
-    const mainHeading = extractMainHeading(normalized);
-    const fallbackRaw = await searchLcsh(mainHeading, { count: 20, searchType: "keyword" });
-    lcshResults = fallbackRaw.map(r => ({ ...r, source: "lcsh" as const }));
+  const results = await Promise.all(searches);
+  const [lcshKeyword, lcnafKeyword] = results;
+  const lcshLeftAnchored = hasSubdivisions ? results[2] : [];
+  const lcnafLeftAnchored = hasSubdivisions ? results[3] : [];
+
+  // Merge and deduplicate by URI
+  const seenUris = new Set<string>();
+  const lcshResults: TaggedLcshResult[] = [];
+  const lcnafResults: TaggedLcshResult[] = [];
+
+  for (const r of [...lcshLeftAnchored, ...lcshKeyword]) {
+    if (!seenUris.has(r.uri)) {
+      seenUris.add(r.uri);
+      lcshResults.push({ ...r, source: "lcsh" as const });
+    }
+  }
+
+  for (const r of [...lcnafLeftAnchored, ...lcnafKeyword]) {
+    if (!seenUris.has(r.uri)) {
+      seenUris.add(r.uri);
+      lcnafResults.push({ ...r, source: "lcnaf" as const });
+    }
   }
 
   return { lcshResults, lcnafResults };
@@ -339,7 +364,7 @@ Return your response as a JSON object with a "terms" array containing objects wi
     const searchResultsMap = new Map<string, { lcshResults: TaggedLcshResult[]; lcnafResults: TaggedLcshResult[] }>();
     await Promise.all(
       terms.map(async (term) => {
-        const results = await searchLOCForTerm(term.suggestedHeading);
+        const results = await searchLOCForTerm(term.suggestedHeading.trim());
         searchResultsMap.set(term.suggestedHeading, results);
       })
     );
@@ -511,7 +536,7 @@ IMPORTANT: The confidence score MUST be an integer from 0 to 100 (e.g., 95 means
       const searchResultsMap = new Map<string, { lcshResults: TaggedLcshResult[]; lcnafResults: TaggedLcshResult[] }>();
       await Promise.all(
         terms.map(async (term) => {
-          const results = await searchLOCForTerm(term.suggestedHeading);
+          const results = await searchLOCForTerm(term.suggestedHeading.trim());
           searchResultsMap.set(term.suggestedHeading, results);
         })
       );
@@ -558,7 +583,7 @@ Return your suggestions as a numbered list, one term per line.`,
       const searchResultsMap = new Map<string, { lcshResults: TaggedLcshResult[]; lcnafResults: TaggedLcshResult[] }>();
       await Promise.all(
         suggestedTerms.map(async (term) => {
-          const results = await searchLOCForTerm(term);
+          const results = await searchLOCForTerm(term.trim());
           searchResultsMap.set(term, results);
         })
       );

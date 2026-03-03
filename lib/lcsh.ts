@@ -16,7 +16,7 @@ export interface SearchOptions {
  * e.g., "English fiction -- 19th century" → "English fiction--19th century"
  */
 export function normalizeQuery(query: string): string {
-    return query.replace(/\s*--\s*/g, "--");
+    return query.replace(/\s*--\s*/g, "--").trim();
 }
 
 /**
