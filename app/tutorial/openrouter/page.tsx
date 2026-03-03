@@ -212,10 +212,10 @@ export default function OpenRouterTutorialPage() {
                   </td>
                 </tr>
                 <tr>
-                  <td className="py-2 pr-4 font-medium">Gemini 2.0 Flash (free)</td>
+                  <td className="py-2 pr-4 font-medium">Gemini 2.5 Flash (free)</td>
                   <td className="py-2 pr-4">
                     <code className="bg-muted px-1 rounded text-xs">
-                      google/gemini-2.0-flash-exp:free
+                      google/gemini-2.5-flash-preview:free
                     </code>
                   </td>
                   <td className="py-2 text-muted-foreground">
@@ -313,7 +313,7 @@ export default function OpenRouterTutorialPage() {
                 </li>
                 <li>
                   <code className="bg-muted px-2 py-1 rounded">
-                    google/gemini-2.0-flash-exp:free
+                    google/gemini-2.5-flash-preview:free
                   </code>
                 </li>
               </ul>
@@ -366,7 +366,7 @@ export default function OpenRouterTutorialPage() {
               selection
             </li>
             <li>
-              <strong>Use Gemini 2.0 Flash (free) for images</strong> — if you need
+              <strong>Use Gemini 2.5 Flash (free) for images</strong> — if you need
               to analyze book covers or title pages, this model supports vision
             </li>
             <li>
