@@ -7,6 +7,7 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { BibliographicInfo, ParsedSuggestions } from "./ai";
 import type { LOCSearchResponse } from "./loc";
+import { getProviderGroup, getProviderHardcodedBaseURL } from "./provider-groups";
 
 export const DEFAULT_SYSTEM_PROMPT_RULES = `# LCSH Selection Rules
 
@@ -250,6 +251,10 @@ export const useAppStore = create<AppStore>()(
       },
 
       getBaseURLForProvider: (provider) => {
+        // Cloud providers always use their hardcoded base URL (or SDK defaults)
+        if (getProviderGroup(provider) === 'cloud') {
+          return getProviderHardcodedBaseURL(provider);
+        }
         const config = get().providerConfigs.find((c) => c.provider === provider);
         return config?.baseURL;
       },
