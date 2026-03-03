@@ -8,7 +8,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { Sparkles, Settings, History, Home, BookOpen, ChevronDown } from "lucide-react";
+import { Sparkles, Settings, History, Home, BookOpen, ChevronDown, FileSpreadsheet } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
 
@@ -19,6 +19,7 @@ export function Navigation() {
   const navItems = [
     { href: "/", label: "Home", icon: Home },
     { href: "/wizard", label: "Wizard", icon: Sparkles },
+    { href: "/batch", label: "Batch", icon: FileSpreadsheet },
     { href: "/history", label: "History", icon: History },
     { href: "/settings", label: "Settings", icon: Settings },
   ];
