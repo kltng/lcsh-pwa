@@ -20,6 +20,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Loader2, CheckCircle2, AlertCircle, RefreshCw } from "lucide-react";
+import { ModelCombobox } from "@/components/model-combobox";
 import {
   CLOUD_PROVIDERS,
   getProviderGroup,
@@ -369,25 +370,16 @@ export default function SettingsPage() {
       <div className="space-y-2">
         <Label htmlFor="model">Model</Label>
         <div className="flex gap-2">
-          <Select
-            value={modelId || ""}
-            onValueChange={setModelId}
-            disabled={loadingModels}
-          >
-            <SelectTrigger id="model" className="flex-1">
-              <SelectValue placeholder={loadingModels ? "Loading models..." : "Select a model"} />
-            </SelectTrigger>
-            <SelectContent>
-              {models.length === 0 && !loadingModels && (
-                <SelectItem value="none" disabled>No models available</SelectItem>
-              )}
-              {models.map((m) => (
-                <SelectItem key={m.id} value={m.id}>
-                  {m.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <div className="flex-1">
+            <ModelCombobox
+              models={models}
+              value={modelId}
+              onValueChange={setModelId}
+              placeholder={loadingModels ? "Loading models..." : "Select a model"}
+              disabled={loadingModels}
+              loading={loadingModels}
+            />
+          </div>
           {group === 'cloud' && provider && (
             <Button
               variant="outline"
@@ -404,13 +396,6 @@ export default function SettingsPage() {
             </Button>
           )}
         </div>
-        
-        {loadingModels && (
-          <p className="text-sm text-muted-foreground flex items-center gap-2">
-            <Loader2 className="h-4 w-4 animate-spin" />
-            Loading models...
-          </p>
-        )}
       </div>
     );
   }
@@ -615,24 +600,17 @@ export default function SettingsPage() {
         
         <div className="space-y-2">
           <Label htmlFor="model">Model ID *</Label>
-          <div className="flex gap-2">
-            <Input
-              id="model"
-              value={modelId || ""}
-              onChange={(e) => setModelId(e.target.value)}
-              placeholder="Enter model ID (e.g., gpt-4, llama-3)"
-              className="flex-1"
-              list="model-suggestions"
-            />
-            <datalist id="model-suggestions">
-              {models.map((m) => (
-                <option key={m.id} value={m.id} />
-              ))}
-            </datalist>
-          </div>
+          <ModelCombobox
+            models={models}
+            value={modelId}
+            onValueChange={setModelId}
+            placeholder="Search or enter model ID..."
+            loading={fetchingModels}
+            allowCustom
+          />
           {models.length > 0 && (
             <p className="text-xs text-muted-foreground">
-              {models.length} model(s) found. Click in the input to see suggestions.
+              {models.length} model(s) found. Type to search or enter a custom ID.
             </p>
           )}
         </div>

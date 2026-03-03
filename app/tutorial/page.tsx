@@ -1,44 +1,12 @@
-import Image from "next/image";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Section, Screenshot } from "@/components/tutorial-helpers";
 
 export const metadata = {
   title: "Tutorial - Cataloging Assistant",
   description:
     "Complete tutorial guide for the LCSH Cataloging Assistant — settings, wizard walkthrough, MARC records, and more.",
 };
-
-function Section({
-  id,
-  title,
-  children,
-}: {
-  id: string;
-  title: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <section id={id} className="scroll-mt-20">
-      <h2 className="text-2xl font-bold mb-6">{title}</h2>
-      {children}
-    </section>
-  );
-}
-
-function Screenshot({ src, alt }: { src: string; alt: string }) {
-  return (
-    <div className="my-6 rounded-lg border overflow-hidden shadow-sm">
-      <Image
-        src={src}
-        alt={alt}
-        width={800}
-        height={500}
-        className="w-full h-auto"
-        loading="lazy"
-      />
-    </div>
-  );
-}
 
 export default function TutorialPage() {
   return (
