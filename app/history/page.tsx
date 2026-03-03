@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/dialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Trash2, Eye, Calendar, Download, ExternalLink, Copy, CheckCircle2 } from "lucide-react";
+import { MarcEditor } from "@/components/marc-editor";
 import { getSimilarityColor } from "@/lib/similarity";
 
 function escCsv(s: string): string {
@@ -90,7 +91,7 @@ function exportAllConversationsCSV(conversations: Conversation[]) {
 }
 
 export default function HistoryPage() {
-  const { conversations, deleteConversation, clearHistory } = useAppStore();
+  const { conversations, deleteConversation, updateConversation, clearHistory } = useAppStore();
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
@@ -111,6 +112,27 @@ export default function HistoryPage() {
     navigator.clipboard.writeText(marc);
     setCopiedIndex(index);
     setTimeout(() => setCopiedIndex(null), 2000);
+  }
+
+  function handleMarcEdit(recIndex: number, term: string, newMarc: string) {
+    if (!selectedConversation) return;
+    const updatedRecs = selectedConversation.finalRecommendations?.map((rec, i) =>
+      i === recIndex ? { ...rec, marc: newMarc } : rec
+    );
+    const updatedMarcRecords = {
+      ...selectedConversation.marcRecords,
+      [term]: newMarc,
+    };
+    updateConversation(selectedConversation.id, {
+      finalRecommendations: updatedRecs,
+      marcRecords: updatedMarcRecords,
+    });
+    // Update local dialog state
+    setSelectedConversation({
+      ...selectedConversation,
+      finalRecommendations: updatedRecs,
+      marcRecords: updatedMarcRecords,
+    });
   }
 
   function handleCopyAllMARC(conversation: Conversation) {
@@ -402,9 +424,11 @@ export default function HistoryPage() {
 
                           {marc && (
                             <div className="flex items-start gap-2">
-                              <pre className="text-xs bg-muted p-2 rounded overflow-x-auto flex-1">
-                                {marc}
-                              </pre>
+                              <MarcEditor
+                                value={marc}
+                                onChange={(v) => handleMarcEdit(idx, rec.term, v)}
+                                className="flex-1"
+                              />
                               <Button
                                 variant="ghost"
                                 size="icon"
