@@ -670,7 +670,18 @@ export default function SettingsPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <Tabs value={activeTab} onValueChange={(v: string) => setActiveTab(v as ProviderGroup)}>
+            <Tabs value={activeTab} onValueChange={(v: string) => {
+              setActiveTab(v as ProviderGroup);
+              // Clear cloud provider when switching to custom endpoint tab
+              // to prevent saving a custom baseURL under a cloud provider's ID
+              if (v === 'openai-compatible' && provider && getProviderGroup(provider) === 'cloud') {
+                setProvider(null as any);
+                setModelId(null);
+                setModels([]);
+                setProviderApiKeys([]);
+                setTestResult(null);
+              }
+            }}>
               <TabsList className="grid w-full grid-cols-2">
                 <TabsTrigger value="cloud">Cloud Providers</TabsTrigger>
                 <TabsTrigger value="openai-compatible">Custom Endpoints</TabsTrigger>

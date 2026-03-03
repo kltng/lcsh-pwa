@@ -212,6 +212,32 @@ function formatError(error: unknown, provider: string): Error {
 }
 
 /**
+ * Builds either a text-only `{ prompt }` or multi-modal `{ messages }` payload
+ * depending on whether images are present in the bibliographic info.
+ */
+function buildUserMessages(
+  textPrompt: string,
+  images?: Array<{ data: string; name: string; type: string }>
+) {
+  if (!images || images.length === 0) {
+    return { prompt: textPrompt };
+  }
+  return {
+    messages: [{
+      role: "user" as const,
+      content: [
+        ...images.map(img => ({
+          type: "image" as const,
+          image: img.data,
+          mimeType: img.type,
+        })),
+        { type: "text" as const, text: textPrompt },
+      ],
+    }],
+  };
+}
+
+/**
  * Main pipeline: generate LCSH suggestions and validate against LOC.
  * Runs entirely in the browser.
  */
@@ -256,6 +282,11 @@ IMPORTANT: You must return a JSON object with a "subjectAnalysis" string and a "
   ]
 }`;
 
+  const hasImages = bibliographicInfo.images && bibliographicInfo.images.length > 0;
+  const imageInstruction = hasImages
+    ? `\n\n${bibliographicInfo.images!.length} image(s) of the work are attached (book covers, title pages, etc.). Analyze them for additional bibliographic information such as title, author, subject matter, and visual clues about the content.`
+    : "";
+
   const userPrompt = `Suggest LCSH terms for:
 
 Title: ${bibliographicInfo.title || "N/A"}
@@ -264,7 +295,7 @@ ${bibliographicInfo.abstract ? `Abstract: ${bibliographicInfo.abstract}` : ""}
 ${bibliographicInfo.tableOfContents ? `Table of Contents: ${bibliographicInfo.tableOfContents}` : ""}
 ${bibliographicInfo.notes ? `Notes: ${bibliographicInfo.notes}` : ""}
 
-Return your response as a JSON object with a "terms" array containing objects with "suggestedHeading" and "reason" properties.`;
+Return your response as a JSON object with a "terms" array containing objects with "suggestedHeading" and "reason" properties.${imageInstruction}`;
 
   const needsJsonInPrompt = sdkProvider === "openai-compatible";
   const enhancedUserPrompt = needsJsonInPrompt
@@ -277,7 +308,7 @@ Return your response as a JSON object with a "terms" array containing objects wi
       model,
       schema: lcshSuggestionSchema,
       system: systemPrompt,
-      prompt: enhancedUserPrompt,
+      ...buildUserMessages(enhancedUserPrompt, bibliographicInfo.images),
       temperature: 0.3,
     } as any);
 
@@ -509,7 +540,7 @@ IMPORTANT: The confidence score MUST be an integer from 0 to 100 (e.g., 95 means
 ${systemPromptRules || ""}
 
 Return your suggestions as a numbered list, one term per line.`,
-        prompt: enhancedUserPrompt,
+        ...buildUserMessages(enhancedUserPrompt, bibliographicInfo.images),
         temperature: 0.3,
         maxTokens: 1024,
       } as any);
