@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { BookOpen, Settings, History, Sparkles } from "lucide-react";
+import { BookOpen, Settings, History, Sparkles, FileSpreadsheet } from "lucide-react";
 
 export default function HomePage() {
   return (
@@ -13,7 +13,7 @@ export default function HomePage() {
         </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <Card>
           <CardHeader>
             <Sparkles className="h-8 w-8 mb-2 text-primary" />
@@ -25,6 +25,21 @@ export default function HomePage() {
           <CardContent>
             <Link href="/wizard">
               <Button className="w-full">Start Wizard</Button>
+            </Link>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <FileSpreadsheet className="h-8 w-8 mb-2 text-primary" />
+            <CardTitle>Batch Processing</CardTitle>
+            <CardDescription>
+              Upload a CSV to process multiple works at once
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Link href="/batch">
+              <Button variant="outline" className="w-full">Start Batch</Button>
             </Link>
           </CardContent>
         </Card>
@@ -43,22 +58,22 @@ export default function HomePage() {
             </Link>
           </CardContent>
         </Card>
-      </div>
 
-      <Card>
-        <CardHeader>
-          <Settings className="h-8 w-8 mb-2 text-primary" />
-          <CardTitle>Settings</CardTitle>
-          <CardDescription>
-            Configure your AI model provider and model
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Link href="/settings">
-            <Button variant="outline" className="w-full">Open Settings</Button>
-          </Link>
-        </CardContent>
-      </Card>
+        <Card>
+          <CardHeader>
+            <Settings className="h-8 w-8 mb-2 text-primary" />
+            <CardTitle>Settings</CardTitle>
+            <CardDescription>
+              Configure your AI model provider and model
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Link href="/settings">
+              <Button variant="outline" className="w-full">Open Settings</Button>
+            </Link>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }

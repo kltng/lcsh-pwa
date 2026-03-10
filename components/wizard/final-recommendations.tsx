@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Copy, CheckCircle2, ExternalLink, Loader2 } from "lucide-react";
+import { MarcEditor } from "@/components/marc-editor";
 import { getSimilarityColor, getSimilarityLabel } from "@/lib/similarity";
 
 export function FinalRecommendations() {
@@ -182,6 +183,17 @@ export function FinalRecommendations() {
     URL.revokeObjectURL(url);
   }
 
+  function handleMarcEdit(term: string, newMarc: string) {
+    // Update Zustand store
+    setMarcRecords({ ...marcRecords, [term]: newMarc });
+    // Update local state so UI reflects immediately
+    setSortedRecommendations((prev) =>
+      prev.map((rec) =>
+        rec.term === term ? { ...rec, marc: newMarc } : rec
+      )
+    );
+  }
+
   if (!finalRecommendations || finalRecommendations.length === 0) {
     return (
       <div className="text-center py-8">
@@ -316,9 +328,10 @@ export function FinalRecommendations() {
                         )}
                       </Button>
                     </div>
-                    <pre className="text-xs bg-muted p-3 rounded overflow-x-auto">
-                      {marc}
-                    </pre>
+                    <MarcEditor
+                      value={marc}
+                      onChange={(v) => handleMarcEdit(rec.term, v)}
+                    />
                   </div>
                 )}
 

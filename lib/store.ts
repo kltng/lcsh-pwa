@@ -123,6 +123,7 @@ interface HistoryState {
   conversations: Conversation[];
   addConversation: (conversation: Omit<Conversation, "id" | "timestamp">) => void;
   deleteConversation: (id: string) => void;
+  updateConversation: (id: string, updates: Partial<Omit<Conversation, "id" | "timestamp">>) => void;
   clearHistory: () => void;
   getConversation: (id: string) => Conversation | undefined;
 }
@@ -321,6 +322,12 @@ export const useAppStore = create<AppStore>()(
       deleteConversation: (id) =>
         set((state) => ({
           conversations: state.conversations.filter((c) => c.id !== id),
+        })),
+      updateConversation: (id, updates) =>
+        set((state) => ({
+          conversations: state.conversations.map((c) =>
+            c.id === id ? { ...c, ...updates } : c
+          ),
         })),
       clearHistory: () => set({ conversations: [] }),
       getConversation: (id) => {
