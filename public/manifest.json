@@ -2,20 +2,20 @@
   "name": "Cataloging Assistant",
   "short_name": "Cataloging Assistant",
   "description": "Progressive Web App built with Next.js and shadcn/ui",
-  "start_url": "/",
+  "start_url": "/lcsh-pwa/",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#000000",
   "orientation": "portrait-primary",
   "icons": [
     {
-      "src": "/icon-192x192.png",
+      "src": "/lcsh-pwa/icon-192x192.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "/icon-512x512.png",
+      "src": "/lcsh-pwa/icon-512x512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"

@@ -1,6 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Section, Screenshot } from "@/components/tutorial-helpers";
+import Link from "next/link";
 
 export const metadata = {
   title: "OpenRouter Guide - Cataloging Assistant",
@@ -262,9 +263,9 @@ export default function OpenRouterTutorialPage() {
           <ol className="list-decimal list-inside space-y-3 text-muted-foreground mb-4">
             <li>
               Go to{" "}
-              <a href="/settings" className="text-primary hover:underline">
+              <Link href="/settings" className="text-primary hover:underline">
                 Settings
-              </a>{" "}
+              </Link>{" "}
               in the Cataloging Assistant
             </li>
             <li>
@@ -397,9 +398,9 @@ export default function OpenRouterTutorialPage() {
       <div className="mt-16 pt-8 border-t text-center">
         <p className="text-muted-foreground">
           For a complete walkthrough of all features, see the{" "}
-          <a href="/tutorial" className="text-primary hover:underline font-medium">
+          <Link href="/tutorial" className="text-primary hover:underline font-medium">
             Complete Tutorial
-          </a>
+          </Link>
           .
         </p>
       </div>
