@@ -23,6 +23,8 @@ jobs:
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
+        with:
+          version: 9
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -37,35 +39,33 @@ jobs:
         run: |
           REPO_NAME=$(echo "$GITHUB_REPOSITORY" | cut -d'/' -f2)
 
-          # Update next.config.ts for static export with basePath
-          cat > next.config.ts << NEXTEOF
-          import type { NextConfig } from "next";
-          import withPWA from "next-pwa";
+          node -e "
+            const fs = require('fs');
+            const repoName = process.argv[1];
 
-          const nextConfig: NextConfig = {
-            output: "export",
-            basePath: "/${REPO_NAME}",
-            images: {
-              unoptimized: true,
-            },
-          };
+            // Patch next.config.ts
+            const config = fs.readFileSync('next.config.ts', 'utf8');
+            const patched = config.replace(
+              /const nextConfig: NextConfig = \{[^}]*\};/s,
+              'const nextConfig: NextConfig = {\n  output: \"export\",\n  basePath: \"/' + repoName + '\",\n  images: {\n    unoptimized: true,\n  },\n};'
+            );
+            fs.writeFileSync('next.config.ts', patched);
 
-          const pwaConfig = withPWA({
-            dest: "public",
-            register: true,
-            skipWaiting: true,
-            disable: process.env.NODE_ENV === "development",
-          });
+            // Patch manifest.json
+            const manifest = JSON.parse(fs.readFileSync('public/manifest.json', 'utf8'));
+            manifest.start_url = '/' + repoName + '/';
+            manifest.icons = manifest.icons.map(icon => ({
+              ...icon,
+              src: '/' + repoName + icon.src
+            }));
+            fs.writeFileSync('public/manifest.json', JSON.stringify(manifest, null, 2));
+          " "$REPO_NAME"
 
-          export default pwaConfig(nextConfig);
-          NEXTEOF
-
-          # Fix indentation (heredoc above adds extra spaces)
-          sed -i 's/^          //' next.config.ts
-
-          # Update manifest.json paths
-          sed -i "s|\"start_url\": \"/\"|\"start_url\": \"/${REPO_NAME}/\"|" public/manifest.json
-          sed -i "s|\"src\": \"/icon-|\"src\": \"/${REPO_NAME}/icon-|g" public/manifest.json
+          echo "Patched next.config.ts:"
+          cat next.config.ts
+          echo ""
+          echo "Patched manifest.json:"
+          cat public/manifest.json
 
       - name: Build
         run: pnpm build
