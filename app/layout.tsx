@@ -17,10 +17,7 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Cataloging Assistant",
   description: "Progressive Web App built with Next.js and shadcn/ui",
-  manifest: "/lcsh-pwa/manifest.json",
-  icons: {
-    apple: "/icon-192x192.png",
-  },
+  manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
@@ -49,6 +46,8 @@ export default function RootLayout({
   return (
     <html lang="en">
       <head>
+        <link rel="manifest" href="/manifest.json" />
+        <link rel="apple-touch-icon" href="/icon-192x192.png" />
         <meta name="theme-color" content="#000000" />
       </head>
       <body

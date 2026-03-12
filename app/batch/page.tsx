@@ -20,7 +20,6 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import Link from "next/link";
 import {
   Table,
   TableBody,
@@ -473,9 +472,9 @@ export default function BatchPage() {
                 <Alert variant="destructive">
                   <AlertDescription>
                     Please configure your AI provider, model, and API key in{" "}
-                    <Link href="/settings" className="underline font-medium">
+                    <a href="/settings" className="underline font-medium">
                       Settings
-                    </Link>{" "}
+                    </a>{" "}
                     before processing.
                   </AlertDescription>
                 </Alert>

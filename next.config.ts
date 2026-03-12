@@ -2,11 +2,7 @@ import type { NextConfig } from "next";
 import withPWA from "next-pwa";
 
 const nextConfig: NextConfig = {
-  output: "export",
-  basePath: "/lcsh-pwa",
-  images: {
-    unoptimized: true,
-  },
+  /* config options here */
 };
 
 const pwaConfig = withPWA({
