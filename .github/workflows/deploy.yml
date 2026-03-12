@@ -33,6 +33,40 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Patch config for GitHub Pages
+        run: |
+          REPO_NAME=$(echo "$GITHUB_REPOSITORY" | cut -d'/' -f2)
+
+          # Update next.config.ts for static export with basePath
+          cat > next.config.ts << NEXTEOF
+          import type { NextConfig } from "next";
+          import withPWA from "next-pwa";
+
+          const nextConfig: NextConfig = {
+            output: "export",
+            basePath: "/${REPO_NAME}",
+            images: {
+              unoptimized: true,
+            },
+          };
+
+          const pwaConfig = withPWA({
+            dest: "public",
+            register: true,
+            skipWaiting: true,
+            disable: process.env.NODE_ENV === "development",
+          });
+
+          export default pwaConfig(nextConfig);
+          NEXTEOF
+
+          # Fix indentation (heredoc above adds extra spaces)
+          sed -i 's/^          //' next.config.ts
+
+          # Update manifest.json paths
+          sed -i "s|\"start_url\": \"/\"|\"start_url\": \"/${REPO_NAME}/\"|" public/manifest.json
+          sed -i "s|\"src\": \"/icon-|\"src\": \"/${REPO_NAME}/icon-|g" public/manifest.json
+
       - name: Build
         run: pnpm build
 
