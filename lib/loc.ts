@@ -15,6 +15,26 @@ export interface LOCSearchResponse {
   error?: string;
 }
 
+const LOC_USER_AGENT = "LCSH-PWA/1.0 (https://github.com/kltng/lcsh-pwa)";
+
+/**
+ * Fetch from LOC API with retry on 429/503 (exponential backoff).
+ */
+async function fetchLOCWithRetry(url: string, maxRetries = 2): Promise<Response> {
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    const response = await fetch(url, {
+      headers: { Accept: "application/json", "User-Agent": LOC_USER_AGENT },
+    });
+    if (response.ok) return response;
+    if ((response.status === 429 || response.status === 503) && attempt < maxRetries) {
+      await new Promise(r => setTimeout(r, Math.pow(2, attempt + 1) * 1000));
+      continue;
+    }
+    throw new Error(`LOC API returned ${response.status}: ${response.statusText}`);
+  }
+  throw new Error("LOC API request failed after retries");
+}
+
 /**
  * Search Library of Congress Subject Headings
  */
@@ -35,14 +55,9 @@ export async function searchLCSH(
       params.append("searchtype", "keyword");
     }
 
-    const response = await fetch(
-      `https://id.loc.gov/authorities/subjects/suggest2?${params.toString()}`,
-      { headers: { Accept: "application/json" } }
+    const response = await fetchLOCWithRetry(
+      `https://id.loc.gov/authorities/subjects/suggest2?${params.toString()}`
     );
-
-    if (!response.ok) {
-      throw new Error(`LOC API returned ${response.status}: ${response.statusText}`);
-    }
 
     const data = await response.json();
     const results = parseLocResponse(data);
@@ -72,14 +87,9 @@ export async function searchLCNAF(
       count: (options?.count || 25).toString(),
     });
 
-    const response = await fetch(
-      `https://id.loc.gov/authorities/names/suggest2?${params.toString()}`,
-      { headers: { Accept: "application/json" } }
+    const response = await fetchLOCWithRetry(
+      `https://id.loc.gov/authorities/names/suggest2?${params.toString()}`
     );
-
-    if (!response.ok) {
-      throw new Error(`LOC API returned ${response.status}: ${response.statusText}`);
-    }
 
     const data = await response.json();
     const results = parseLocResponse(data);
@@ -109,6 +119,8 @@ export async function searchMultipleTerms(
 
       const result = await searchLCSH(term);
       results[term] = result;
+      // Rate limit: space LOC requests to avoid overwhelming the API
+      await new Promise(r => setTimeout(r, 500));
     }
   };
 

@@ -11,6 +11,39 @@ export interface SearchOptions {
     rdftype?: string; // For LCNAF (e.g., "PersonalName")
 }
 
+const LOC_USER_AGENT = "LCSH-PWA/1.0 (https://github.com/kltng/lcsh-pwa)";
+
+/**
+ * Fetch from LOC API with retry on 429/503 (exponential backoff).
+ */
+async function fetchLOCWithRetry(url: string, maxRetries = 2): Promise<Response> {
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 15000);
+
+        const response = await fetch(url, {
+            headers: {
+                "Accept": "application/json",
+                "User-Agent": LOC_USER_AGENT,
+            },
+            signal: controller.signal,
+        });
+
+        clearTimeout(timeoutId);
+
+        if (response.ok) return response;
+
+        if ((response.status === 429 || response.status === 503) && attempt < maxRetries) {
+            const delay = Math.pow(2, attempt + 1) * 1000; // 2s, 4s
+            await new Promise(r => setTimeout(r, delay));
+            continue;
+        }
+
+        throw new Error(`LOC API returned ${response.status}: ${response.statusText}`);
+    }
+    throw new Error("LOC API request failed after retries");
+}
+
 /**
  * Normalizes a query by stripping spaces around "--" delimiters.
  * e.g., "English fiction -- 19th century" → "English fiction--19th century"
@@ -100,31 +133,11 @@ export async function searchLcsh(query: string, options: SearchOptions = {}): Pr
     }
 
     try {
-        // Add timeout to prevent hanging requests
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout (increased)
-
         const fullUrl = `${url}?${params.toString()}`;
-
-        const response = await fetch(fullUrl, {
-            headers: {
-                "Accept": "application/json",
-            },
-            signal: controller.signal,
-            // Remove 'next' option for server-side fetch - it's only for Next.js route handlers
-        });
-
-        clearTimeout(timeoutId);
-
-        if (!response.ok) {
-            throw new Error(`LOC API returned ${response.status}: ${response.statusText}`);
-        }
-
+        const response = await fetchLOCWithRetry(fullUrl);
         const data = await response.json();
-        const results = parseLocResponse(data);
-        return results;
+        return parseLocResponse(data);
     } catch (error) {
-        // If it's a timeout, DNS error, or network error, return empty array instead of throwing
         if (error instanceof Error && (
             error.name === 'AbortError' ||
             error.message.includes('fetch failed') ||
@@ -133,7 +146,9 @@ export async function searchLcsh(query: string, options: SearchOptions = {}): Pr
             error.message.includes('getaddrinfo') ||
             error.message.includes('Could not resolve host') ||
             error.message.includes('network') ||
-            error.message.includes('ECONNREFUSED')
+            error.message.includes('ECONNREFUSED') ||
+            error.message.includes('429') ||
+            error.message.includes('503')
         )) {
             return [];
         }
@@ -162,31 +177,11 @@ export async function searchLcnaf(query: string, options: SearchOptions = {}): P
     }
 
     try {
-        // Add timeout to prevent hanging requests
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout (increased)
-
         const fullUrl = `${url}?${params.toString()}`;
-
-        const response = await fetch(fullUrl, {
-            headers: {
-                "Accept": "application/json",
-            },
-            signal: controller.signal,
-            // Remove 'next' option for server-side fetch - it's only for Next.js route handlers
-        });
-
-        clearTimeout(timeoutId);
-
-        if (!response.ok) {
-            throw new Error(`LOC API returned ${response.status}: ${response.statusText}`);
-        }
-
+        const response = await fetchLOCWithRetry(fullUrl);
         const data = await response.json();
-        const results = parseLocResponse(data);
-        return results;
+        return parseLocResponse(data);
     } catch (error) {
-        // If it's a timeout, DNS error, or network error, return empty array instead of throwing
         if (error instanceof Error && (
             error.name === 'AbortError' ||
             error.message.includes('fetch failed') ||
@@ -195,7 +190,9 @@ export async function searchLcnaf(query: string, options: SearchOptions = {}): P
             error.message.includes('getaddrinfo') ||
             error.message.includes('Could not resolve host') ||
             error.message.includes('network') ||
-            error.message.includes('ECONNREFUSED')
+            error.message.includes('ECONNREFUSED') ||
+            error.message.includes('429') ||
+            error.message.includes('503')
         )) {
             return [];
         }

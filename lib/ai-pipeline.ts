@@ -359,15 +359,23 @@ Return your response as a JSON object with a "terms" array containing objects wi
       }
     }
 
-    // Step 1: Search LOC for ALL terms in parallel
+    // Step 1: Search LOC for terms with rate limiting (2 concurrent, 500ms delay)
     const validatedTerms: ValidatedTerm[] = [];
     const searchResultsMap = new Map<string, { lcshResults: TaggedLcshResult[]; lcnafResults: TaggedLcshResult[] }>();
-    await Promise.all(
-      terms.map(async (term) => {
-        const results = await searchLOCForTerm(term.suggestedHeading.trim());
-        searchResultsMap.set(term.suggestedHeading, results);
-      })
-    );
+    {
+      const queue = [...terms];
+      const processQueue = async () => {
+        while (queue.length > 0) {
+          const term = queue.shift();
+          if (!term) continue;
+          const results = await searchLOCForTerm(term.suggestedHeading.trim());
+          searchResultsMap.set(term.suggestedHeading, results);
+          if (queue.length > 0) await new Promise(r => setTimeout(r, 500));
+        }
+      };
+      const workers = Array.from({ length: Math.min(2, terms.length) }, () => processQueue());
+      await Promise.all(workers);
+    }
 
     // Step 2: Try AI-powered selection
     let aiSelectionSucceeded = false;
@@ -534,12 +542,11 @@ IMPORTANT: The confidence score MUST be an integer from 0 to 100 (e.g., 95 means
     if (terms.length > 0) {
       const validatedTerms: ValidatedTerm[] = [];
       const searchResultsMap = new Map<string, { lcshResults: TaggedLcshResult[]; lcnafResults: TaggedLcshResult[] }>();
-      await Promise.all(
-        terms.map(async (term) => {
-          const results = await searchLOCForTerm(term.suggestedHeading.trim());
-          searchResultsMap.set(term.suggestedHeading, results);
-        })
-      );
+      for (const term of terms) {
+        const results = await searchLOCForTerm(term.suggestedHeading.trim());
+        searchResultsMap.set(term.suggestedHeading, results);
+        await new Promise(r => setTimeout(r, 500));
+      }
 
       for (const term of terms) {
         const results = searchResultsMap.get(term.suggestedHeading);
@@ -581,12 +588,11 @@ Return your suggestions as a numbered list, one term per line.`,
 
       const validatedTerms: ValidatedTerm[] = [];
       const searchResultsMap = new Map<string, { lcshResults: TaggedLcshResult[]; lcnafResults: TaggedLcshResult[] }>();
-      await Promise.all(
-        suggestedTerms.map(async (term) => {
-          const results = await searchLOCForTerm(term.trim());
-          searchResultsMap.set(term, results);
-        })
-      );
+      for (const term of suggestedTerms) {
+        const results = await searchLOCForTerm(term.trim());
+        searchResultsMap.set(term, results);
+        await new Promise(r => setTimeout(r, 500));
+      }
 
       for (const suggested of suggestedTerms) {
         const results = searchResultsMap.get(suggested);
